@@ -22,6 +22,17 @@ func (dataNull) IsNull() {}
 
 func (dataNull) getLength() int { return 4 }
 
+type dataBool struct {
+	value bool
+}
+
+func (obj *dataBool) getLength() int {
+	if obj.value {
+		return 4
+	}
+	return 5
+}
+
 type DataBool interface {
 	DataBase
 	Get() bool
