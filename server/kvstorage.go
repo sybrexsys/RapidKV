@@ -5,13 +5,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/sybrexsys/RapidKV/common"
+	"github.com/sybrexsys/RapidKV/datamodel"
 )
 
 type kvElementh struct {
 	key   string
-	value common.DataCommon
+	value datamodel.DataCommon
 	ttl   time.Duration
+	ttc   time.Duration
 }
 
 type keyHash [sha1.BlockSize]byte
