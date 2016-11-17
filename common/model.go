@@ -1,31 +1,25 @@
 package common
 
-
-type interface DataNull {
-    
+type DataCommon interface {
 }
 
-type interface DataBool {
-
+type DataNull interface {
 }
 
-type interface DataInt {
-
+type DataBool interface {
 }
 
-type interface DataReal {
-
+type DataInt interface {
 }
 
-type interface DataString{
-
-} 
-
-type interface DataArray {
-
+type DataReal interface {
 }
 
+type DataString interface {
+}
 
-type interface DataDictionary {
+type DataArray interface {
+}
 
+type DataDictionary interface {
 }
