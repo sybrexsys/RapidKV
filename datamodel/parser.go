@@ -1,54 +1,229 @@
 package datamodel
 
-const (
-	ltInteger   = iota /* Integer Lexeme       */
-	ltReal             /* Real Lexeme          */
-	ltEOF              /* End of File Lexeme   */
-	ltBoolean          /* Boolean Lexeme       */
-	ltNull             /* NULL Lexeme          */
-	ltSmCommand        /* Small Command Lexeme */
-	ltName             /* Name Lexeme          */
-	ltCommand          /* Command Lexeme       */
-	ltString           /* String Lexeme        */
-	ltStringHex        /* Hex String Lexeme    */
+import (
+	"errors"
 )
 
 const (
-	smOpenArray       = iota /* Small Command Lexeme Open Array      */
-	smCloseArray             /* Small Command Lexeme Close Array     */
-	smOpenDictionary         /* Small Command Lexeme Open Dictionary */
-	smCloseDictionary        /* Small Command Lexeme CloseDictionary */
+	ltInteger = iota
+	ltReal
+	ltEOF
+	ltBoolean
+	ltNull
+	ltSmCommand
+	ltString
+)
+
+const (
+	smOpenArray = iota
+	smCloseArray
+	smOpenDictionary
+	smCloseDictionary
+	smComma
+	smColon
 )
 
 type lexeme struct {
-	lexType   int     /* Lexemå type                              */
-	str       string  /* Pointer where stored data after parse    */
-	intValue  int     /* Return value for Integer lexemes         */
-	realValue float64 /* Return value for real lexemes            */
+	lexType   int
+	str       string
+	intValue  int
+	realValue float64
 }
 
-type parser struct {
+type back int
+
+func (back) getLength() int                     { return 0 }
+func (back) writeToBytes(b []byte) (int, error) { return 0, nil }
+
+func getLexema(b []byte, offset *int, lex *lexeme) error {
+	lenb := len(b)
+	var ch byte
+	var buf [5]byte
+	for {
+		if *offset >= lenb {
+			lex.lexType = ltEOF
+			return nil
+		}
+		ch = b[*offset]
+		if ch == '\t' || ch == '\r' || ch == '\n' || ch == ' ' {
+			*offset++
+			continue
+		}
+		break
+	}
+	switch ch {
+	case '{':
+		lex.intValue = smOpenDictionary
+		lex.lexType = ltSmCommand
+		*offset++
+		return nil
+	case '}':
+		lex.intValue = smCloseDictionary
+		lex.lexType = ltSmCommand
+		*offset++
+		return nil
+	case '[':
+		lex.intValue = smOpenArray
+		lex.lexType = ltSmCommand
+		*offset++
+		return nil
+	case ']':
+		lex.intValue = smCloseArray
+		lex.lexType = ltSmCommand
+		*offset++
+		return nil
+	case ':':
+		lex.intValue = smColon
+		lex.lexType = ltSmCommand
+		*offset++
+		return nil
+	case ',':
+		lex.intValue = smComma
+		lex.lexType = ltSmCommand
+		*offset++
+		return nil
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '.':
+	case '"':
+	default:
+		i := 0
+		for {
+			if i == 5 {
+				return errors.New("unknow token was found")
+			}
+			buf[i] = ch
+			*offset++
+			if *offset >= lenb {
+				break
+			}
+			ch = b[*offset]
+			if ch == '\t' || ch == '\r' || ch == '\n' || ch == ' ' {
+				*offset++
+				break
+			}
+			if ch == '}' || ch == ']' || ch == ',' {
+				break
+			}
+			i++
+		}
+		str := string(buf[:i+1])
+		if str == "null" {
+			lex.lexType = ltNull
+			return nil
+		}
+		if str == "true" {
+			lex.lexType = ltBoolean
+			lex.intValue = 1
+			return nil
+		}
+		if str == "false" {
+			lex.lexType = ltBoolean
+			lex.intValue = 0
+			return nil
+		}
+	}
+	return errors.New("unknow token was found")
 }
 
-/*
-func getLexema(p parser) (*lexeme, error) {
-    return nil
+func processArray(b []byte, offset *int, lex *lexeme) (*dataArray, error) {
+	tmp := CreateArray(10)
+	for {
+		obj, err := ParseObj(b, offset, lex)
+		if err != nil {
+			return nil, err
+		}
+		v, ok := obj.(back)
+		if ok {
+			if v == smCloseArray {
+				return tmp, nil
+			}
+			return nil, errors.New("invalid lexeme not found")
+		}
+		tmp.Add(obj)
+		err = getLexema(b, offset, lex)
+		if err != nil {
+			return nil, err
+		}
+		if lex.lexType != ltSmCommand {
+			return nil, errors.New("invalid lexeme not found")
+		}
+		if lex.intValue == smCloseArray {
+			return tmp, nil
+		}
+		if lex.intValue != smComma {
+			return nil, errors.New("invalid lexeme was found")
+		}
+	}
 }
 
-func ParseObj(p parser ) (DataBase, error) {
-    lex, err := getLexema(p)
-    if err != nil {
-        return nil, err
-    }
-    switch lex.lexType {
-    case ltInteger:
-    case ltBoolean:
-    case ltNull: return dataNull, nil
-    case ltString:
-    case ltEOF:
-    case ltSmCommand:
-
-    }
-	return
+func processDictionary(b []byte, offset *int, lex *lexeme) (*dataDictionary, error) {
+	tmp := CreateDictionary(10)
+	for {
+		err := getLexema(b, offset, lex)
+		if err != nil {
+			return nil, err
+		}
+		if lex.lexType == ltSmCommand && lex.intValue == smCloseDictionary {
+			return tmp, nil
+		}
+		if lex.lexType != ltString {
+			return nil, errors.New("string lexeme not found")
+		}
+		key := lex.str
+		err = getLexema(b, offset, lex)
+		if err != nil {
+			return nil, err
+		}
+		if lex.lexType != ltSmCommand || lex.intValue != smColon {
+			return nil, errors.New("string lexeme not found")
+		}
+		obj, err := ParseObj(b, offset, lex)
+		if err != nil {
+			return nil, err
+		}
+		tmp.Add(key, obj)
+		err = getLexema(b, offset, lex)
+		if err != nil {
+			return nil, err
+		}
+		if lex.lexType != ltSmCommand {
+			return nil, errors.New("string lexeme not found")
+		}
+		if lex.intValue == smCloseDictionary {
+			return tmp, nil
+		}
+		if lex.intValue != smComma {
+			return nil, errors.New("invalid lexeme was found")
+		}
+	}
 }
-*/
+
+func ParseObj(b []byte, offset *int, lex *lexeme) (CustomDataType, error) {
+	err := getLexema(b, offset, lex)
+	if err != nil {
+		return nil, err
+	}
+	switch lex.lexType {
+	case ltInteger:
+		return CreateInt(lex.intValue), nil
+	case ltBoolean:
+		return CreateBool(lex.intValue != 0), nil
+	case ltNull:
+		return CreateNull(), nil
+	case ltString:
+		return CreateString(lex.str), nil
+	case ltEOF:
+		return nil, errors.New("EOF was found")
+	case ltSmCommand:
+		switch lex.intValue {
+		case smOpenArray:
+			return processArray(b, offset, lex)
+		case smOpenDictionary:
+			return processDictionary(b, offset, lex)
+		case smCloseArray:
+			return back(smCloseArray), nil
+		case smCloseDictionary:
+			return back(smCloseDictionary), nil
+		}
+	}
+	return nil, errors.New("unknow lexeme")
+}

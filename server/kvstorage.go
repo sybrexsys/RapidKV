@@ -10,7 +10,7 @@ import (
 
 type kvElementh struct {
 	key   string
-	value datamodel.DataCommon
+	value datamodel.CustomDataType
 	ttl   time.Duration
 	ttc   time.Duration
 }
