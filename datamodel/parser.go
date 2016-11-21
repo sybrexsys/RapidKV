@@ -39,54 +39,57 @@ func getStringLexeme(b []byte, offset *int, lex *lexeme) error {
 	*offset++
 	lenb := len(b)
 	length := 0
-	localoffset := offset
 	for {
-		if *offset+ length == lenb {
+		if *offset+length == lenb {
 			return errors.New("unterminate string lexeme")
 		}
-		ch := b[*offset+ length]
-		if ch = '"' {
+		ch := b[*offset+length]
+		if ch == '"' {
 			break
 		}
 		length++
-		if ch != '\\'{
+		if ch != '\\' {
 			continue
 		}
-		if *offset+ length == lenb {
+		if *offset+length == lenb {
 			return errors.New("unterminate string lexeme")
 		}
-		ch = b[*offset+ length]
-		if ch == 'r'||ch=='n'||ch=='t' ||ch=='f' ||ch=='b' {
+		ch = b[*offset+length]
+		if ch == 'r' || ch == 'n' || ch == 't' || ch == 'f' || ch == 'b' || ch == '\\' || ch == '"' {
 			continue
 		}
-		if ch =='u'{
+		if ch != 'u' {
+			return errors.New("invalid token")
+		}
+		if *offset+length+4 >= lenb {
+			return errors.New("unterminate string lexeme")
+		}
 
-		}  
+	}
+	//arr := make([]byte, length)
+	for {
+		ch := b[*offset+length]
+		if ch == '"' {
+			break
+		}
+		length++
+		if ch != '\\' {
+			continue
+		}
+		ch = b[*offset+length]
+		if ch == 'r' || ch == 'n' || ch == 't' || ch == 'f' || ch == 'b' {
+			continue
+		}
+		if ch == 'u' {
+
+		}
 		return errors.New("invalid token")
 	}
-	arr := make([]byte,length) 
-	for {
-		ch := b[*offset+ length]
-		if ch = '"' {
-			break
-		}
-		length++
-		if ch != '\\'{
-			continue
-		}
-		ch = b[*offset+ length]
-		if ch == 'r'||ch=='n'||ch=='t' ||ch=='f' ||ch=='b' {
-			continue
-		}
-		if ch =='u'{
-
-		}  
-		return errors.New("invalid token")
-	}	
+	return nil
 }
 
 func getNumberLexeme(b []byte, offset *int, lex *lexeme) error {
-
+	return nil
 }
 
 func getLexeme(b []byte, offset *int, lex *lexeme) error {
