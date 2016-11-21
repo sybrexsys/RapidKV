@@ -35,7 +35,61 @@ type back int
 func (back) getLength() int                     { return 0 }
 func (back) writeToBytes(b []byte) (int, error) { return 0, nil }
 
-func getLexema(b []byte, offset *int, lex *lexeme) error {
+func getStringLexeme(b []byte, offset *int, lex *lexeme) error {
+	*offset++
+	lenb := len(b)
+	length := 0
+	localoffset := offset
+	for {
+		if *offset+ length == lenb {
+			return errors.New("unterminate string lexeme")
+		}
+		ch := b[*offset+ length]
+		if ch = '"' {
+			break
+		}
+		length++
+		if ch != '\\'{
+			continue
+		}
+		if *offset+ length == lenb {
+			return errors.New("unterminate string lexeme")
+		}
+		ch = b[*offset+ length]
+		if ch == 'r'||ch=='n'||ch=='t' ||ch=='f' ||ch=='b' {
+			continue
+		}
+		if ch =='u'{
+
+		}  
+		return errors.New("invalid token")
+	}
+	arr := make([]byte,length) 
+	for {
+		ch := b[*offset+ length]
+		if ch = '"' {
+			break
+		}
+		length++
+		if ch != '\\'{
+			continue
+		}
+		ch = b[*offset+ length]
+		if ch == 'r'||ch=='n'||ch=='t' ||ch=='f' ||ch=='b' {
+			continue
+		}
+		if ch =='u'{
+
+		}  
+		return errors.New("invalid token")
+	}	
+}
+
+func getNumberLexeme(b []byte, offset *int, lex *lexeme) error {
+
+}
+
+func getLexeme(b []byte, offset *int, lex *lexeme) error {
 	lenb := len(b)
 	var ch byte
 	var buf [5]byte
@@ -83,7 +137,9 @@ func getLexema(b []byte, offset *int, lex *lexeme) error {
 		*offset++
 		return nil
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '.':
+		return getNumberLexeme(b, offset, lex)
 	case '"':
+		return getStringLexeme(b, offset, lex)
 	default:
 		i := 0
 		for {
@@ -139,7 +195,7 @@ func processArray(b []byte, offset *int, lex *lexeme) (*dataArray, error) {
 			return nil, errors.New("invalid lexeme not found")
 		}
 		tmp.Add(obj)
-		err = getLexema(b, offset, lex)
+		err = getLexeme(b, offset, lex)
 		if err != nil {
 			return nil, err
 		}
@@ -158,7 +214,7 @@ func processArray(b []byte, offset *int, lex *lexeme) (*dataArray, error) {
 func processDictionary(b []byte, offset *int, lex *lexeme) (*dataDictionary, error) {
 	tmp := CreateDictionary(10)
 	for {
-		err := getLexema(b, offset, lex)
+		err := getLexeme(b, offset, lex)
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +225,7 @@ func processDictionary(b []byte, offset *int, lex *lexeme) (*dataDictionary, err
 			return nil, errors.New("string lexeme not found")
 		}
 		key := lex.str
-		err = getLexema(b, offset, lex)
+		err = getLexeme(b, offset, lex)
 		if err != nil {
 			return nil, err
 		}
@@ -181,7 +237,7 @@ func processDictionary(b []byte, offset *int, lex *lexeme) (*dataDictionary, err
 			return nil, err
 		}
 		tmp.Add(key, obj)
-		err = getLexema(b, offset, lex)
+		err = getLexeme(b, offset, lex)
 		if err != nil {
 			return nil, err
 		}
@@ -198,7 +254,7 @@ func processDictionary(b []byte, offset *int, lex *lexeme) (*dataDictionary, err
 }
 
 func ParseObj(b []byte, offset *int, lex *lexeme) (CustomDataType, error) {
-	err := getLexema(b, offset, lex)
+	err := getLexeme(b, offset, lex)
 	if err != nil {
 		return nil, err
 	}
