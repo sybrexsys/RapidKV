@@ -3,7 +3,7 @@ package server
 import (
 	"errors"
 	"github.com/sybrexsys/RapidKV/datamodel"
-	"hash/crc32"
+	"hash/crc64"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,6 +26,8 @@ var startTime = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 
 const maxTime = time.Duration(0x7FFFFFFFFFFFFFFF)
 
+var crc64Table = crc64.MakeTable(crc64.ECMA)
+
 type shardElem struct {
 	sync.RWMutex
 	mapkv             map[string]*kvElementh
@@ -40,7 +42,7 @@ type serverKV struct {
 }
 
 func crc(Key string) int {
-	return int(crc32.ChecksumIEEE([]byte(Key)))
+	return int(crc64.Checksum([]byte(Key), crc64Table))
 }
 
 func (shard *shardElem) ttlChecker() {
