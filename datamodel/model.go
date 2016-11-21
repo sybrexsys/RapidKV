@@ -60,6 +60,13 @@ type DataDictionary interface {
 	Value(Key string) CustomDataType
 }
 
+func DataObjectToString(obj CustomDataType) string {
+	l := obj.getLength()
+	m := make([]byte, l)
+	obj.writeToBytes(m)
+	return string(m)
+}
+
 // Null section
 type dataNull struct{}
 

@@ -2,24 +2,24 @@ package server
 
 import (
 	"errors"
-	"github.com/sybrexsys/RapidKV/datamodel"
 	"hash/crc64"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/sybrexsys/RapidKV/datamodel"
 )
 
-const shardCount = 256
+const shardCount = 128
 
 const ttlCheckPeriod = time.Millisecond * 500
 
 type kvElementh struct {
+	sync.RWMutex
 	value       datamodel.CustomDataType
 	ttl         time.Duration
 	ttc         time.Duration
-	lockSession time.Duration
-	lockttc     time.Duration
-	lock        int32
+	lockSession int64
 }
 
 var startTime = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -41,8 +41,8 @@ type serverKV struct {
 	group    *sync.WaitGroup
 }
 
-func crc(Key string) int {
-	return int(crc64.Checksum([]byte(Key), crc64Table))
+func crc(Key string) uint {
+	return uint(crc64.Checksum([]byte(Key), crc64Table))
 }
 
 func (shard *shardElem) ttlChecker() {
@@ -51,7 +51,10 @@ func (shard *shardElem) ttlChecker() {
 	ct := time.Since(startTime)
 	nextttl := maxTime
 	for k, v := range shard.mapkv {
-		if (v.ttl < ct) && (v.lock == 0) {
+		if v.lockSession != 0 {
+			continue
+		}
+		if v.ttl < ct {
 			delete(shard.mapkv, k)
 		} else {
 			if nextttl > v.ttl {
@@ -63,7 +66,6 @@ func (shard *shardElem) ttlChecker() {
 }
 
 func (shard *shardElem) ttlloop(group *sync.WaitGroup) {
-	group.Add(1)
 	ticker := time.NewTicker(ttlCheckPeriod).C
 loop:
 	for {
@@ -71,7 +73,7 @@ loop:
 		case _ = <-ticker:
 			next := atomic.LoadInt64(&shard.nextTTLProcessing)
 			if next < int64(time.Since(startTime)) {
-				shard.ttlChecker()
+				//		shard.ttlChecker()
 			}
 		case _ = <-shard.quit:
 			break loop
@@ -82,6 +84,7 @@ loop:
 
 func createServer() *serverKV {
 	server := &serverKV{group: &sync.WaitGroup{}}
+	server.group.Add(shardCount)
 	for i := 0; i < shardCount; i++ {
 		shred := &shardElem{
 			mapkv:             make(map[string]*kvElementh, 256),
@@ -106,31 +109,15 @@ func (server *serverKV) keyToShard(Key string) *shardElem {
 	return server.baseList[shardidx]
 }
 
-func (server *serverKV) SetValue(Key string, Value datamodel.CustomDataType, Session time.Duration) (*kvElementh, error) {
-	elem, ok := server.GetValue(Key)
-	if ok {
-		if !atomic.CompareAndSwapInt32(&elem.lock, 0, 1) {
-			if elem.lockSession != Session {
-				return nil, errors.New("record busy")
-			}
-		} else {
-			defer atomic.StoreInt32(&elem.lock, 0)
-		}
-		elem.value = Value
-		elem.ttc = time.Since(startTime)
-		elem.ttl = maxTime
-		return elem, nil
-	}
+func (server *serverKV) SetValue(Key string, Value datamodel.CustomDataType, Session int64) (*kvElementh, error) {
 	shard := server.keyToShard(Key)
 	shard.Lock()
 	defer shard.Unlock()
-	// check on append
-	elem, ok = shard.mapkv[Key]
+	elem, ok := shard.mapkv[Key]
 	if ok {
-		if !atomic.CompareAndSwapInt32(&elem.lock, 0, 1) {
+		if elem.lockSession != 0 && elem.lockSession != Session {
 			return nil, errors.New("record busy")
 		}
-		defer atomic.StoreInt32(&elem.lock, 0)
 		elem.value = Value
 		elem.ttc = time.Since(startTime)
 		elem.ttl = maxTime
@@ -145,83 +132,80 @@ func (server *serverKV) SetValue(Key string, Value datamodel.CustomDataType, Ses
 	return elem, nil
 }
 
-func (server *serverKV) GetValue(Key string) (*kvElementh, bool) {
+func (server *serverKV) GetValue(Key string) (datamodel.CustomDataType, bool) {
 	shard := server.keyToShard(Key)
 	shard.RLock()
 	defer shard.RUnlock()
 	el, ok := shard.mapkv[Key]
-	return el, ok
+	return el.value, ok
 }
 
-func (server *serverKV) LockValue(Key string, Session time.Duration) error {
+func (server *serverKV) LockValue(Key string, Session int64) error {
 	shard := server.keyToShard(Key)
-	shard.RLock()
-	defer shard.RUnlock()
+	shard.Lock()
+	defer shard.Unlock()
 	elem, ok := shard.mapkv[Key]
 	if !ok {
 		return errors.New("record not found")
 	}
-	if !atomic.CompareAndSwapInt32(&elem.lock, 0, 1) {
-		if elem.lockSession != Session {
-			return errors.New("record busy")
-		}
+	if elem.lockSession != 0 && elem.lockSession != Session {
+		return errors.New("record busy")
 	}
+	elem.lockSession = Session
 	return nil
 }
 
-func (server *serverKV) UnlockValue(Key string, Session time.Duration) error {
+func (server *serverKV) UnlockValue(Key string, Session int64) error {
 	shard := server.keyToShard(Key)
-	shard.RLock()
-	defer shard.RUnlock()
+	shard.Lock()
+	defer shard.Unlock()
 	elem, ok := shard.mapkv[Key]
 	if !ok {
 		return errors.New("record not found")
 	}
-	if !atomic.CompareAndSwapInt32(&elem.lock, 0, 1) {
-		if elem.lockSession != Session {
-			return errors.New("record busy")
-		}
+	if elem.lockSession == 0 {
+		return nil
 	}
+	if elem.lockSession != Session {
+		return errors.New("record busy by other session")
+	}
+	elem.lockSession = 0
 	elem.ttc = time.Since(startTime)
 	elem.ttl = maxTime
-	atomic.StoreInt32(&elem.lock, 0)
 	return nil
 }
 
-func (server *serverKV) SetTTL(Key string, TTL time.Duration, Session time.Duration) error {
-	var needRLock bool
+func (server *serverKV) SetTTL(Key string, TTL int, Session int64) error {
 	shard := server.keyToShard(Key)
-	shard.RLock()
-	defer func() {
-		if needRLock {
-			shard.RUnlock()
-		}
-	}()
+	shard.Lock()
+	defer shard.Unlock()
 	elem, ok := shard.mapkv[Key]
 	if !ok {
 		return errors.New("record not found")
 	}
-	if !atomic.CompareAndSwapInt32(&elem.lock, 0, 1) {
-		if elem.lockSession != Session {
-			return errors.New("record busy")
-		}
+	if elem.lockSession != 0 && elem.lockSession != Session {
+		return errors.New("record busy")
 	}
-	elem.ttl = elem.ttc + TTL
+	elem.ttl = elem.ttc + time.Millisecond*time.Duration(TTL)
 	if elem.ttl < time.Since(startTime) {
-		shard.RUnlock()
-		needRLock = false
-		shard.Lock()
-		defer shard.Unlock()
 		delete(shard.mapkv, Key)
 	} else {
 		next := atomic.LoadInt64(&shard.nextTTLProcessing)
 		if next > int64(elem.ttl) {
-			shard.ttlMutex.Lock()
-			defer shard.ttlMutex.Unlock()
 			if shard.nextTTLProcessing > int64(elem.ttl) {
-				shard.nextTTLProcessing = int64(elem.ttl)
+				atomic.StoreInt64(&shard.nextTTLProcessing, int64(elem.ttl))
 			}
 		}
 	}
 	return nil
+}
+
+func (server *serverKV) GetCount() int {
+	cnt := int(0)
+	for i := 0; i < shardCount; i++ {
+		server.baseList[i].RLock()
+		cnt += len(server.baseList[i].mapkv)
+		server.baseList[i].RUnlock()
+	}
+	return cnt
 }

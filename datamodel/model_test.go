@@ -168,5 +168,5 @@ func TestParsing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%s", err.Error())
 	}
-	checkResult(t, obj, "null")
+	checkResult(t, obj, "[true, false, null]")
 }
