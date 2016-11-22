@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/sybrexsys/RapidKV/datamodel"
+	"time"
 )
 
 func TestStartStop(t *testing.T) {
@@ -23,11 +24,7 @@ func TestSetGet(t *testing.T) {
 		for i := 0; i < treats; i++ {
 			go func(a int) {
 				for i := 0; i < 1000; i++ {
-					//_, err :=
 					server.SetValue("test"+strconv.Itoa(a*i%10000), datamodel.CreateInt(a<<32+i), int64(a))
-					//					if err != nil {
-					//						t.Fatal(err.Error)
-					//					}
 				}
 				group.Done()
 			}(i)
@@ -58,6 +55,7 @@ func TestTTL(t *testing.T) {
 		group.Done()
 	}()
 	group.Wait()
+	time.Sleep(500 * time.Millisecond)
 	fmt.Printf("Server consist %d records\n", server.GetCount())
 	server.Close()
 }

@@ -262,6 +262,8 @@ func CreateString(str string) *dataString {
 	return &dataString{val: str}
 }
 
+var hex = []byte("01234567890abcdef")
+
 func writeToBytes(str string, b []byte) (int, error) {
 	lenb := len(b)
 	src := []byte(str)
@@ -272,47 +274,40 @@ func writeToBytes(str string, b []byte) (int, error) {
 	offset := 1
 	for _, ch := range src {
 		switch ch {
-		case 0:
-			if lenb < offset+2 {
-				return -1, errors.New("don't enougth space for store")
-			}
-			b[offset] = '\\'
-			b[offset+1] = '0'
-			offset += 2
-		case '\t':
+		case 9:
 			if lenb < offset+2 {
 				return -1, errors.New("don't enougth space for store")
 			}
 			b[offset] = '\\'
 			b[offset+1] = 't'
 			offset += 2
-		case '\r':
+		case 8:
 			if lenb < offset+2 {
 				return -1, errors.New("don't enougth space for store")
 			}
 			b[offset] = '\\'
-			b[offset+1] = 'r'
+			b[offset+1] = 'b'
 			offset += 2
-		case '\n':
+		case 10:
 			if lenb < offset+2 {
 				return -1, errors.New("don't enougth space for store")
 			}
 			b[offset] = '\\'
 			b[offset+1] = 'n'
 			offset += 2
-		case '\f':
+		case 12:
 			if lenb < offset+2 {
 				return -1, errors.New("don't enougth space for store")
 			}
 			b[offset] = '\\'
 			b[offset+1] = 'f'
 			offset += 2
-		case '\b':
+		case 13:
 			if lenb < offset+2 {
 				return -1, errors.New("don't enougth space for store")
 			}
 			b[offset] = '\\'
-			b[offset+1] = 'b'
+			b[offset+1] = 'r'
 			offset += 2
 		case '/':
 			if lenb < offset+2 {
@@ -336,11 +331,25 @@ func writeToBytes(str string, b []byte) (int, error) {
 			b[offset+1] = '\\'
 			offset += 2
 		default:
-			if lenb < offset+1 {
-				return -1, errors.New("don't enougth space for store")
+			if ch < 0x1f {
+				if lenb < offset+6 {
+					return -1, errors.New("don't enougth space for store")
+				}
+				b[offset] = '\\'
+				b[offset+1] = 'u'
+				b[offset+2] = '0'
+				b[offset+3] = '0'
+				b[offset+4] = hex[ch>>4]
+				b[offset+5] = hex[ch&0xf]
+				offset += 6
+			} else {
+				if lenb < offset+1 {
+					return -1, errors.New("don't enougth space for store")
+				}
+				b[offset] = ch
+				offset++
 			}
-			b[offset] = ch
-			offset++
+
 		}
 	}
 	if lenb < offset+1 {
@@ -359,10 +368,14 @@ func getLength(str string) int {
 	d := []byte(str)
 	for _, c := range d {
 		switch c {
-		case '\t', '\n', '\r', '"', '\\', '/', '\f', '\b':
+		case 8, 9, 10, 12, 13, '"', '\\', '/':
 			cnt += 2
 		default:
-			cnt++
+			if c < 0x1f {
+				cnt += 6
+			} else {
+				cnt++
+			}
 		}
 	}
 	return cnt + 2

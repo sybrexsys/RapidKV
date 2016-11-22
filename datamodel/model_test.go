@@ -1,25 +1,9 @@
 package datamodel
 
-import "testing"
-
-var specChars = [256]byte{
-	1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-}
+import (
+	//"fmt"
+	"testing"
+)
 
 func typeObject(t *testing.T, obj CustomDataType) string {
 	l := obj.getLength()
@@ -119,7 +103,7 @@ func TestDictionaryWork(t *testing.T) {
 	arr := CreateArray(0)
 	d1 := CreateDictionary(10)
 	arr.Adds(CreateDictionary(10), d1)
-	dict.Add("Test", arr)
+	dict.Add("Test1", arr)
 	arr.Adds(
 		CreateNull(),
 		CreateBool(false),
@@ -127,10 +111,11 @@ func TestDictionaryWork(t *testing.T) {
 		CreateInt(100),
 		CreateInt(-100),
 		CreateReal(3.14),
-		CreateString("3.14000 \t \r \n \" \\ test Русский язык "),
+		CreateString("3.14000 \t \r \n \" \\ \b  \f / test Русский язык "),
 	)
+	dict.Add("Test2", CreateInt(100))
 	var test CustomDataType
-	test = arr
+	test = dict
 	l := test.getLength()
 	for i := 0; i < l; i++ {
 		m := make([]byte, i)
@@ -146,7 +131,7 @@ func TestPrimitives(t *testing.T) {
 	checkResult(t, CreateBool(false), "false")
 	checkResult(t, CreateInt(-100), "-100")
 	checkResult(t, CreateReal(3.14), "3.14")
-	checkResult(t, CreateString("3.1400 \t \r \n \" \\ test Русский язык "), "\"3.1400 \\t \\r \\n \\\" \\\\ test Русский язык \"")
+	checkResult(t, CreateString("\000 3.1400 \t \r \n \" \\ test Русский язык "), "\"\\u0000 3.1400 \\t \\r \\n \\\" \\\\ test Русский язык \"")
 	a := CreateBool(false)
 	a.Set(!a.Get())
 	checkResult(t, a, "true")
@@ -161,12 +146,107 @@ func TestPrimitives(t *testing.T) {
 	checkResult(t, d, "\"Test passed\"")
 }
 
+var mustFailLexeme = []string{
+	"-1.10s",
+	"-.10",
+	"-1.10\\",
+	`"test\u00"`,
+	`"test\u003"`,
+	"",
+	"/\rnull",
+	"/*\rnull",
+	" \r/**/",
+	"\"\testsrtdsasdsasdsadas\\\\ \\r \\u10Fa",
+	`"test`,
+	`"test\u005 "`,
+	`"test\ "`,
+	`"test\s "`,
+	`"test\u"`,
+	`"test\u0"`,
+}
+
+var mustPassLexeme = []string{
+	"-1.10]",
+	"1.10",
+	"1234 ",
+	"4455.5e-1",
+
+	"\"\\testsrtdsasdsasdsadas\\\\ \\r \\u10Fa \"",
+	`"\u005c \t a \r alses"
+	`,
+	`" rt" /* testcomment */`,
+	"\rnull",
+	"//test\rnull",
+	"//test\rnull",
+	"/**/null",
+	"{}",
+	"[]",
+	//	"\"testsrt\"",
+
+}
+
+func TestParsingLexeme(t *testing.T) {
+	for i := 0; i < len(mustPassLexeme); i++ {
+		//		fmt.Printf("Step %d\n%s\n", i, mustPassLexeme[i])
+		data := []byte(mustPassLexeme[i])
+		off := 0
+		lex := new(lexeme)
+		err := getLexeme(data, &off, lex)
+		if err != nil {
+			t.Fatalf("Step %d\r Bellow lexeme must be parsed without error\r%s\r Bellow error was received \r%s", i, mustPassLexeme[i], err.Error())
+		}
+	}
+	for i := 0; i < len(mustFailLexeme); i++ {
+		//		fmt.Printf("Step %d\n%s\n", i, mustFailLexeme[i])
+		data := []byte(mustFailLexeme[i])
+		off := 0
+		lex := new(lexeme)
+		err := getLexeme(data, &off, lex)
+		if err == nil {
+			t.Fatalf("Step %d\r Bellow lexeme must be parsed with error\r%s", i, mustFailLexeme[i])
+		}
+	}
+}
+
 func TestParsing(t *testing.T) {
+
 	offset := 0
 	lex := new(lexeme)
-	obj, err := ParseObj([]byte("[true, false, null]"), &offset, lex)
+	obj, err := parseObj([]byte("[true, false, null]"), &offset, lex)
 	if err != nil {
 		t.Fatalf("%s", err.Error())
 	}
 	checkResult(t, obj, "[true, false, null]")
+
+	strongTest := `
+		{"a1":[true,null," rt" /* testcomment */],
+			"b2":false//,
+			,
+			//
+			"c3":"testOther"}`
+
+	offset = 0
+	_, err = parseObj([]byte(strongTest), &offset, lex)
+	if err != nil {
+		t.Fatalf("%s", err.Error())
+	}
+
+	strongTest = `
+		{"ccc1":[true,null," rt" /* testcomment */, 100.4 ,-5, 90, 4.01e+5, 0]
+			}`
+
+	offset = 0
+	_, err = parseObj([]byte(strongTest), &offset, lex)
+	if err != nil {
+		t.Fatalf("%s", err.Error())
+	}
+	_, err = LoadJSONObj([]byte(strongTest))
+	if err != nil {
+		t.Fatalf("%s", err.Error())
+	}
+	strongTest = strongTest + `/*  */ [true]`
+	_, err = LoadJSONObj([]byte(strongTest))
+	if err == nil {
+		t.Fatal("Error object must be found")
+	}
 }

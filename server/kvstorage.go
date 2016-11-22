@@ -46,6 +46,7 @@ func crc(Key string) uint {
 }
 
 func (shard *shardElem) ttlChecker() {
+
 	shard.Lock()
 	defer shard.Unlock()
 	ct := time.Since(startTime)
@@ -73,7 +74,7 @@ loop:
 		case _ = <-ticker:
 			next := atomic.LoadInt64(&shard.nextTTLProcessing)
 			if next < int64(time.Since(startTime)) {
-				//		shard.ttlChecker()
+				shard.ttlChecker()
 			}
 		case _ = <-shard.quit:
 			break loop
