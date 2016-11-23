@@ -6,18 +6,19 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/sybrexsys/RapidKV/datamodel"
 	"time"
+
+	"github.com/sybrexsys/RapidKV/datamodel"
 )
 
 func TestStartStop(t *testing.T) {
-	server := createServer()
+	server := CreateServer()
 	server.Close()
 }
 
 func BenchmarkSetGet(b *testing.B) {
 	treats := b.N
-	server := createServer()
+	server := CreateServer()
 	var group sync.WaitGroup
 	group.Add(treats + 1)
 	go func() {
@@ -38,7 +39,7 @@ func BenchmarkSetGet(b *testing.B) {
 
 func TestTTL(t *testing.T) {
 	treats := 50
-	server := createServer()
+	server := CreateServer()
 	var group sync.WaitGroup
 	group.Add(treats + 1)
 	go func() {

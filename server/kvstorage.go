@@ -22,6 +22,11 @@ type kvElementh struct {
 	lockSession int64
 }
 
+type kvElementhCopy struct {
+	key  string
+	data *kvElementh
+}
+
 var startTime = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 
 const maxTime = time.Duration(0x7FFFFFFFFFFFFFFF)
@@ -36,7 +41,7 @@ type shardElem struct {
 	quit              chan struct{}
 }
 
-type serverKV struct {
+type ServerKV struct {
 	baseList [shardCount]*shardElem
 	group    *sync.WaitGroup
 }
@@ -83,8 +88,8 @@ loop:
 	group.Done()
 }
 
-func createServer() *serverKV {
-	server := &serverKV{group: &sync.WaitGroup{}}
+func CreateServer() *ServerKV {
+	server := &ServerKV{group: &sync.WaitGroup{}}
 	server.group.Add(shardCount)
 	for i := 0; i < shardCount; i++ {
 		shred := &shardElem{
@@ -98,19 +103,19 @@ func createServer() *serverKV {
 	return server
 }
 
-func (server *serverKV) Close() {
+func (server *ServerKV) Close() {
 	for i := 0; i < shardCount; i++ {
 		server.baseList[i].quit <- struct{}{}
 	}
 	server.group.Wait()
 }
 
-func (server *serverKV) keyToShard(Key string) *shardElem {
+func (server *ServerKV) keyToShard(Key string) *shardElem {
 	shardidx := crc(Key) % shardCount
 	return server.baseList[shardidx]
 }
 
-func (server *serverKV) SetValue(Key string, Value datamodel.CustomDataType, Session int64) (*kvElementh, error) {
+func (server *ServerKV) SetValue(Key string, Value datamodel.CustomDataType, Session int64) (*kvElementh, error) {
 	shard := server.keyToShard(Key)
 	shard.Lock()
 	defer shard.Unlock()
@@ -133,7 +138,7 @@ func (server *serverKV) SetValue(Key string, Value datamodel.CustomDataType, Ses
 	return elem, nil
 }
 
-func (server *serverKV) GetValue(Key string) (datamodel.CustomDataType, bool) {
+func (server *ServerKV) GetValue(Key string) (datamodel.CustomDataType, bool) {
 	shard := server.keyToShard(Key)
 	shard.RLock()
 	defer shard.RUnlock()
@@ -141,7 +146,7 @@ func (server *serverKV) GetValue(Key string) (datamodel.CustomDataType, bool) {
 	return el.value, ok
 }
 
-func (server *serverKV) LockValue(Key string, Session int64) error {
+func (server *ServerKV) LockValue(Key string, Session int64) error {
 	shard := server.keyToShard(Key)
 	shard.Lock()
 	defer shard.Unlock()
@@ -156,7 +161,7 @@ func (server *serverKV) LockValue(Key string, Session int64) error {
 	return nil
 }
 
-func (server *serverKV) UnlockValue(Key string, Session int64) error {
+func (server *ServerKV) UnlockValue(Key string, Session int64) error {
 	shard := server.keyToShard(Key)
 	shard.Lock()
 	defer shard.Unlock()
@@ -176,7 +181,7 @@ func (server *serverKV) UnlockValue(Key string, Session int64) error {
 	return nil
 }
 
-func (server *serverKV) SetTTL(Key string, TTL int, Session int64) error {
+func (server *ServerKV) SetTTL(Key string, TTL int, Session int64) error {
 	shard := server.keyToShard(Key)
 	shard.Lock()
 	defer shard.Unlock()
@@ -201,7 +206,7 @@ func (server *serverKV) SetTTL(Key string, TTL int, Session int64) error {
 	return nil
 }
 
-func (server *serverKV) GetCount() int {
+func (server *ServerKV) GetCount() int {
 	cnt := int(0)
 	for i := 0; i < shardCount; i++ {
 		server.baseList[i].RLock()
@@ -211,19 +216,14 @@ func (server *serverKV) GetCount() int {
 	return cnt
 }
 
-func (shard *shardElem) copyShard() *shardElem {
+func (shard *shardElem) copyShard() []kvElementhCopy {
 	shard.Lock()
 	defer shard.Unlock()
-	tmp := &shardElem{
-		mapkv: make(map[string]*kvElementh, len(shard.mapkv)),
-	}
+	tmp := make([]kvElementhCopy, len(shard.mapkv))
+	i := 0
 	for k, v := range shard.mapkv {
-		newv := &kvElementh{
-			ttl:   v.ttc,
-			ttc:   v.ttc,
-			value: v.value.Copy(),
-		}
-		tmp.mapkv[k] = newv
+		tmp[i].key = k
+		tmp[i].data = v
 	}
 	return tmp
 }
