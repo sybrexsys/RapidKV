@@ -15,8 +15,8 @@ func TestStartStop(t *testing.T) {
 	server.Close()
 }
 
-func TestSetGet(t *testing.T) {
-	treats := 500
+func BenchmarkSetGet(b *testing.B) {
+	treats := b.N
 	server := createServer()
 	var group sync.WaitGroup
 	group.Add(treats + 1)
@@ -24,7 +24,7 @@ func TestSetGet(t *testing.T) {
 		for i := 0; i < treats; i++ {
 			go func(a int) {
 				for i := 0; i < 1000; i++ {
-					server.SetValue("test"+strconv.Itoa(a*i%10000), datamodel.CreateInt(a<<32+i), int64(a))
+					server.SetValue("test"+strconv.Itoa(a<<32+i), datamodel.CreateInt(a<<32+i), int64(a))
 				}
 				group.Done()
 			}(i)
@@ -56,6 +56,5 @@ func TestTTL(t *testing.T) {
 	}()
 	group.Wait()
 	time.Sleep(500 * time.Millisecond)
-	fmt.Printf("Server consist %d records\n", server.GetCount())
 	server.Close()
 }

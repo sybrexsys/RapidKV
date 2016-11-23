@@ -7,9 +7,9 @@ import (
 )
 
 func typeObject(t *testing.T, obj CustomDataType) string {
-	l := obj.getLength()
+	l := obj.GetLength()
 	m := make([]byte, l)
-	_, err := obj.writeToBytes(m)
+	_, err := obj.WriteToBytes(m)
 	if err != nil {
 		t.Fatalf("Calculation returns error: %s", err.Error())
 	}
@@ -65,7 +65,7 @@ func TestArrayWork(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		arr.Remove(0)
 	}
-	arr.Adds(CreateBool(true), CreateBool(false))
+	arr.Add(CreateBool(true), CreateBool(false))
 	checkResult(t, arr, "[true, true, true, false]")
 	arr.Insert(1, CreateBool(false))
 	checkResult(t, arr, "[true, false, true, true, false]")
@@ -103,9 +103,9 @@ func TestDictionaryWork(t *testing.T) {
 	checkResult(t, dict, "{\"Test1\":false}")
 	arr := CreateArray(0)
 	d1 := CreateDictionary(10)
-	arr.Adds(CreateDictionary(10), d1)
+	arr.Add(CreateDictionary(10), d1)
 	dict.Add("Test1", arr)
-	arr.Adds(
+	arr.Add(
 		CreateNull(),
 		CreateBool(false),
 		CreateBool(true),
@@ -117,10 +117,10 @@ func TestDictionaryWork(t *testing.T) {
 	dict.Add("Test2", CreateInt(100))
 	var test CustomDataType
 	test = dict
-	l := test.getLength()
+	l := test.GetLength()
 	for i := 0; i < l; i++ {
 		m := make([]byte, i)
-		if _, err := test.writeToBytes(m); err == nil {
+		if _, err := test.WriteToBytes(m); err == nil {
 			t.Fatalf("Function must return Error, %d %s", i, string(m))
 		}
 	}
@@ -758,9 +758,9 @@ func TestLoadAndSave(t *testing.T) {
 	if err != nil {
 		t.Fatal("Error " + err.Error())
 	}
-	l := obj.getLength()
+	l := obj.GetLength()
 	m := make([]byte, l)
-	_, err = obj.writeToBytes(m)
+	_, err = obj.WriteToBytes(m)
 	if err != nil {
 		t.Fatal("Error " + err.Error())
 	}
@@ -774,11 +774,11 @@ func BenchmarkSaveJsonOneAlloc(b *testing.B) {
 	if err != nil {
 		b.Fatal("Error " + err.Error())
 	}
-	l := obj.getLength()
+	l := obj.GetLength()
 	m := make([]byte, l)
 	for n := 0; n < b.N; n++ {
 
-		_, err = obj.writeToBytes(m)
+		_, err = obj.WriteToBytes(m)
 		if err != nil {
 			b.Fatal("Error " + err.Error())
 		}
@@ -797,10 +797,10 @@ func BenchmarkSaveJsonEachAlloc(b *testing.B) {
 	}
 	ll := 0
 	for n := 0; n < b.N; n++ {
-		l := obj.getLength()
+		l := obj.GetLength()
 		ll += l
 		m := make([]byte, l)
-		_, err = obj.writeToBytes(m)
+		_, err = obj.WriteToBytes(m)
 		if err != nil {
 			b.Fatal("Error " + err.Error())
 		}

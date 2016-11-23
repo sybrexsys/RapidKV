@@ -34,8 +34,10 @@ type lexeme struct {
 
 type back int
 
-func (back) getLength() int                     { return 0 }
-func (back) writeToBytes(b []byte) (int, error) { return 0, nil }
+func (back) GetLength() int                     { return 0 }
+func (back) WriteToBytes(b []byte) (int, error) { return 0, nil }
+
+func (obj back) Copy() CustomDataType { return obj }
 
 type eof struct{}
 
@@ -346,7 +348,7 @@ func getLexeme(b []byte, offset *int, lex *lexeme) error {
 	return errors.New("unknow token was found")
 }
 
-func processArray(b []byte, offset *int, lex *lexeme) (*dataArray, error) {
+func processArray(b []byte, offset *int, lex *lexeme) (DataArray, error) {
 	tmp := CreateArray(10)
 	for {
 		obj, err := parseObj(b, offset, lex)
@@ -377,7 +379,7 @@ func processArray(b []byte, offset *int, lex *lexeme) (*dataArray, error) {
 	}
 }
 
-func processDictionary(b []byte, offset *int, lex *lexeme) (*dataDictionary, error) {
+func processDictionary(b []byte, offset *int, lex *lexeme) (DataDictionary, error) {
 	tmp := CreateDictionary(10)
 	for {
 		err := getLexeme(b, offset, lex)

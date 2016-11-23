@@ -210,3 +210,20 @@ func (server *serverKV) GetCount() int {
 	}
 	return cnt
 }
+
+func (shard *shardElem) copyShard() *shardElem {
+	shard.Lock()
+	defer shard.Unlock()
+	tmp := &shardElem{
+		mapkv: make(map[string]*kvElementh, len(shard.mapkv)),
+	}
+	for k, v := range shard.mapkv {
+		newv := &kvElementh{
+			ttl:   v.ttc,
+			ttc:   v.ttc,
+			value: v.value.Copy(),
+		}
+		tmp.mapkv[k] = newv
+	}
+	return tmp
+}
