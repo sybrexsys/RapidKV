@@ -2,7 +2,7 @@ package datamodel
 
 import (
 	"errors"
-	//	"fmt"
+	//"fmt"
 	"strconv"
 	"unicode/utf8"
 )
@@ -52,30 +52,30 @@ func calcStringSize(b []byte, offset int) (int, error) {
 		}
 		length++
 		if ch < 0x1f {
-			return -1, errors.New("invalid token 666")
+			return -1, errors.New("invalid token was found")
 		}
 		if ch != '\\' {
 			continue
 		}
 		i++
 		if i == lenb {
-			return -1, errors.New("unterminate string lexeme 65")
+			return -1, errors.New("unterminate string lexeme was found")
 		}
 		ch = b[i]
 		if ch == 'r' || ch == 'n' || ch == 't' || ch == 'f' || ch == 'b' || ch == '\\' || ch == '"' || ch == '/' {
 			continue
 		}
 		if ch != 'u' {
-			return -1, errors.New("invalid token 2")
+			return -1, errors.New("invalid token was found")
 		}
 		length += 2
 		i += 4
 		if i >= lenb {
-			return -1, errors.New("unterminate string lexeme55")
+			return -1, errors.New("unterminate string lexeme was found")
 		}
 	}
 	if i == lenb {
-		return -1, errors.New("unterminate string lexeme www")
+		return -1, errors.New("unterminate string lexeme was found")
 	}
 	return length, nil
 
@@ -95,7 +95,7 @@ func getRune(b []byte, offset int) (rune, error) {
 		} else if ch >= 'A' && ch <= 'F' {
 			l = ch - 'A' + 10
 		} else {
-			return 0, errors.New("invalid character was found as")
+			return 0, errors.New("invalid character was found")
 		}
 		ac |= uint16(l)
 	}
@@ -148,7 +148,7 @@ func getStringLexeme(b []byte, offset *int, lex *lexeme) error {
 			copy(arr[i:], runebuffer[0:cnt])
 			i += cnt
 		default:
-			return errors.New("invalid token 23")
+			return errors.New("invalid token was found")
 		}
 	}
 	lex.str = string(arr)
@@ -165,10 +165,10 @@ func getNumberLexeme(b []byte, offset *int, lex *lexeme) error {
 		isNegative = true
 		*offset++
 		if *offset == lenb {
-			return errors.New("invalid token was not found ssaaa")
+			return errors.New("invalid token was found")
 		}
 		if b[*offset] == '.' {
-			return errors.New("invalid token was not found ssaaa")
+			return errors.New("invalid token was found")
 		}
 	}
 	fractalFound := false
@@ -189,7 +189,7 @@ func getNumberLexeme(b []byte, offset *int, lex *lexeme) error {
 		} else if ch == '}' || ch == ']' || ch == ',' || ch == '/' || ch == '\t' || ch == '\r' || ch == '\n' || ch == ' ' {
 			break
 		}
-		return errors.New("invalid token was not found aaadd")
+		return errors.New("invalid token was found")
 	}
 	if isNegative {
 		intPart = -intPart
@@ -208,7 +208,7 @@ func getNumberLexeme(b []byte, offset *int, lex *lexeme) error {
 		if ch == '}' || ch == ']' || ch == ',' || ch == '\t' || ch == '\r' || ch == '\n' || ch == ' ' || ch == '/' {
 			break
 		}
-		return errors.New("invalid token was not found in fractal part")
+		return errors.New("invalid token was found in fractal part")
 	}
 	float, err := strconv.ParseFloat(string(b[start:*offset]), 64)
 	if err != nil {
@@ -230,7 +230,7 @@ mainloop:
 		// comments check. JSON not supported json but I appended such functionality
 		if ch == '/' {
 			if *offset == lenb-1 {
-				return errors.New("invalid lexeme was not found aaa")
+				return errors.New("invalid lexeme was not found")
 			}
 			*offset++
 			ch := b[*offset]
@@ -254,7 +254,7 @@ mainloop:
 				}
 
 			} else {
-				return errors.New("invalid lexeme was not found as")
+				return errors.New("invalid lexeme was found")
 			}
 		}
 		// break
@@ -310,7 +310,7 @@ func getLexeme(b []byte, offset *int, lex *lexeme) error {
 		i := 0
 		for {
 			if i == 5 {
-				return errors.New("unknow token was found " + strconv.Itoa(*offset))
+				return errors.New("unknow token was found")
 			}
 			buf[i] = ch
 			*offset++
@@ -343,7 +343,7 @@ func getLexeme(b []byte, offset *int, lex *lexeme) error {
 			return nil
 		}
 	}
-	return errors.New("unknow token was found 0")
+	return errors.New("unknow token was found")
 }
 
 func processArray(b []byte, offset *int, lex *lexeme) (*dataArray, error) {
@@ -358,7 +358,7 @@ func processArray(b []byte, offset *int, lex *lexeme) (*dataArray, error) {
 			if v == smCloseArray {
 				return tmp, nil
 			}
-			return nil, errors.New("invalid lexeme not found 1")
+			return nil, errors.New("invalid lexeme not found")
 		}
 		tmp.Add(obj)
 		err = getLexeme(b, offset, lex)
@@ -366,13 +366,13 @@ func processArray(b []byte, offset *int, lex *lexeme) (*dataArray, error) {
 			return nil, err
 		}
 		if lex.lexType != ltSmCommand {
-			return nil, errors.New("invalid lexeme not found 2")
+			return nil, errors.New("invalid lexeme not found")
 		}
 		if lex.intValue == smCloseArray {
 			return tmp, nil
 		}
 		if lex.intValue != smComma {
-			return nil, errors.New("invalid lexeme was found 3")
+			return nil, errors.New("invalid lexeme was found")
 		}
 	}
 }
@@ -388,7 +388,7 @@ func processDictionary(b []byte, offset *int, lex *lexeme) (*dataDictionary, err
 			return tmp, nil
 		}
 		if lex.lexType != ltString {
-			return nil, errors.New("string lexeme not found 4")
+			return nil, errors.New("string lexeme was not found")
 		}
 		key := lex.str
 		err = getLexeme(b, offset, lex)
@@ -396,7 +396,7 @@ func processDictionary(b []byte, offset *int, lex *lexeme) (*dataDictionary, err
 			return nil, err
 		}
 		if lex.lexType != ltSmCommand || lex.intValue != smColon {
-			return nil, errors.New("string lexeme not found 1")
+			return nil, errors.New("colon lexeme was not found")
 		}
 		obj, err := parseObj(b, offset, lex)
 		if err != nil {
@@ -408,13 +408,13 @@ func processDictionary(b []byte, offset *int, lex *lexeme) (*dataDictionary, err
 			return nil, err
 		}
 		if lex.lexType != ltSmCommand {
-			return nil, errors.New("string lexeme not found 2")
+			return nil, errors.New("string lexeme was not found")
 		}
 		if lex.intValue == smCloseDictionary {
 			return tmp, nil
 		}
 		if lex.intValue != smComma {
-			return nil, errors.New("invalid lexeme was found 5")
+			return nil, errors.New("invalid lexeme was found")
 		}
 	}
 }
@@ -447,26 +447,34 @@ func parseObj(b []byte, offset *int, lex *lexeme) (obj CustomDataType, er error)
 			return back(smCloseDictionary), nil
 		}
 	}
-	return nil, errors.New("unknow lexeme !")
+	return nil, errors.New("unknow lexeme was found")
 }
 
 func LoadJSONObj(b []byte) (obj CustomDataType, er error) {
-	lex := new(lexeme)
 	offset := 0
-	/*	defer func() {
-		if er != nil {
-			fmt.Printf("'E'rror %s\roffset:%d\r%s\r", er.Error(), offset, string(b[offset:]))
-		}
-	}()*/
-	obj, err := parseObj(b, &offset, lex)
+	obj, err := LoadOneJSONObj(b, &offset)
 	if err != nil {
 		return nil, err
 	}
 	finished := offset
+	lex := &lexeme{}
 	_, err = parseObj(b, &offset, lex)
 	_, iseof := err.(eof)
 	if !iseof {
 		return nil, errors.New("extra data present from " + strconv.Itoa(finished))
 	}
 	return obj, nil
+}
+
+func LoadOneJSONObj(b []byte, offset *int) (obj CustomDataType, er error) {
+	lex := new(lexeme)
+	if *offset < 0 {
+		*offset = 0
+	}
+	/*	defer func() {
+		if er != nil {
+			fmt.Printf("'Error %s in %s\roffset:%d\r%s\r", er.Error(), string(b), offset, string(b[*offset:]))
+		}
+	}()*/
+	return parseObj(b, offset, lex)
 }
