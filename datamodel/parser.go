@@ -34,8 +34,8 @@ type lexeme struct {
 
 type back int
 
-func (back) GetLength() int                     { return 0 }
-func (back) WriteToBytes(b []byte) (int, error) { return 0, nil }
+func (back) getLength() int                     { return 0 }
+func (back) writeToBytes(b []byte) (int, error) { return 0, nil }
 
 func (obj back) Copy() CustomDataType { return obj }
 

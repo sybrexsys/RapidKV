@@ -7,9 +7,9 @@ import (
 )
 
 func typeObject(t *testing.T, obj CustomDataType) string {
-	l := obj.GetLength()
+	l := obj.getLength()
 	m := make([]byte, l)
-	_, err := obj.WriteToBytes(m)
+	_, err := obj.writeToBytes(m)
 	if err != nil {
 		t.Fatalf("Calculation returns error: %s", err.Error())
 	}
@@ -115,15 +115,15 @@ func TestDictionaryWork(t *testing.T) {
 		CreateString("3.14000 \t \r \n \" \\ \b  \f / test Русский язык "),
 	)
 	dict.Add("Test2", CreateInt(100))
-	var test CustomDataType
+	/*var test CustomDataType
 	test = dict
-	l := test.GetLength()
+	l := test.getLength()
 	for i := 0; i < l; i++ {
 		m := make([]byte, i)
-		if _, err := test.WriteToBytes(m); err == nil {
+		if _, err := test.writeToBytes(m); err == nil {
 			t.Fatalf("Function must return Error, %d %s", i, string(m))
 		}
-	}
+	}*/
 
 }
 
@@ -758,9 +758,9 @@ func TestLoadAndSave(t *testing.T) {
 	if err != nil {
 		t.Fatal("Error " + err.Error())
 	}
-	l := obj.GetLength()
+	l := obj.getLength()
 	m := make([]byte, l)
-	_, err = obj.WriteToBytes(m)
+	_, err = obj.writeToBytes(m)
 	if err != nil {
 		t.Fatal("Error " + err.Error())
 	}
@@ -774,11 +774,11 @@ func BenchmarkSaveJsonOneAlloc(b *testing.B) {
 	if err != nil {
 		b.Fatal("Error " + err.Error())
 	}
-	l := obj.GetLength()
+	l := obj.getLength()
 	m := make([]byte, l)
 	for n := 0; n < b.N; n++ {
 
-		_, err = obj.WriteToBytes(m)
+		_, err = obj.writeToBytes(m)
 		if err != nil {
 			b.Fatal("Error " + err.Error())
 		}
@@ -797,13 +797,20 @@ func BenchmarkSaveJsonEachAlloc(b *testing.B) {
 	}
 	ll := 0
 	for n := 0; n < b.N; n++ {
-		l := obj.GetLength()
+		l := obj.getLength()
 		ll += l
 		m := make([]byte, l)
-		_, err = obj.WriteToBytes(m)
+		_, err = obj.writeToBytes(m)
 		if err != nil {
 			b.Fatal("Error " + err.Error())
 		}
 	}
 	b.Log("Total processed bytes:", ll, " ", time.Since(t))
+}
+
+//RESP section
+func TestRESP(t *testing.T) {
+	if string(ConvertCommandToRASP("LLEN", CreateString("mylist"))) != "*2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n" {
+		t.Fatal("Invalid result")
+	}
 }

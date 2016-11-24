@@ -1,6 +1,7 @@
 package datamodel
 
 import (
+	"bytes"
 	"errors"
 	"strconv"
 )
@@ -10,8 +11,8 @@ import (
 )*/
 
 type CustomDataType interface {
-	GetLength() int
-	WriteToBytes(b []byte) (int, error)
+	getLength() int
+	writeToBytes(b []byte) (int, error)
 	Copy() CustomDataType
 }
 
@@ -62,9 +63,9 @@ type DataDictionary interface {
 }
 
 func DataObjectToString(obj CustomDataType) string {
-	l := obj.GetLength()
+	l := obj.getLength()
 	m := make([]byte, l)
-	obj.WriteToBytes(m)
+	obj.writeToBytes(m)
 	return string(m)
 }
 
@@ -83,9 +84,9 @@ func (obj *dataNull) Copy() CustomDataType {
 
 func (*dataNull) isNull() {}
 
-func (*dataNull) GetLength() int { return 4 }
+func (*dataNull) getLength() int { return 4 }
 
-func (*dataNull) WriteToBytes(b []byte) (int, error) {
+func (*dataNull) writeToBytes(b []byte) (int, error) {
 	if len(b) < 4 {
 		return -1, errors.New("don't enougth space for store")
 	}
@@ -113,14 +114,14 @@ func (obj *dataBool) Set(Value bool) {
 	obj.val = Value
 }
 
-func (obj *dataBool) GetLength() int {
+func (obj *dataBool) getLength() int {
 	if obj.val {
 		return 4
 	}
 	return 5
 }
 
-func (obj *dataBool) WriteToBytes(b []byte) (int, error) {
+func (obj *dataBool) writeToBytes(b []byte) (int, error) {
 	if obj.val {
 		if len(b) < 4 {
 			return -1, errors.New("don't enougth space for store")
@@ -175,14 +176,14 @@ func (obj *dataInt) Set(Value int) {
 	obj.val = Value
 }
 
-func (obj *dataInt) GetLength() int {
+func (obj *dataInt) getLength() int {
 	if obj.val >= 0 {
 		return getIntSize(obj.val)
 	}
 	return getIntSize(-obj.val) + 1
 }
 
-func (obj *dataInt) WriteToBytes(b []byte) (int, error) {
+func (obj *dataInt) writeToBytes(b []byte) (int, error) {
 	var tot [20]byte
 	i := 0
 	var k int
@@ -253,11 +254,11 @@ func (obj *dataReal) Set(Value float64) {
 	obj.val = Value
 }
 
-func (obj *dataReal) GetLength() int {
+func (obj *dataReal) getLength() int {
 	return getRealSize(obj.val)
 }
 
-func (obj *dataReal) WriteToBytes(b []byte) (int, error) {
+func (obj *dataReal) writeToBytes(b []byte) (int, error) {
 	str := strconv.FormatFloat(obj.val, 'f', -1, 64)
 	if len(b) < len(str) {
 		return -1, errors.New("don't enougth space for store")
@@ -281,7 +282,7 @@ func CreateString(str string) DataString {
 
 var hex = []byte("01234567890abcdef")
 
-func WriteToBytes(str string, b []byte) (int, error) {
+func writeToBytes(str string, b []byte) (int, error) {
 	lenb := len(b)
 	src := []byte(str)
 	if lenb < 2 {
@@ -376,11 +377,11 @@ func WriteToBytes(str string, b []byte) (int, error) {
 	return offset + 1, nil
 }
 
-func (obj *dataString) WriteToBytes(b []byte) (int, error) {
-	return WriteToBytes(obj.val, b)
+func (obj *dataString) writeToBytes(b []byte) (int, error) {
+	return writeToBytes(obj.val, b)
 }
 
-func GetLength(str string) int {
+func getLength(str string) int {
 	cnt := 0
 	d := []byte(str)
 	for _, c := range d {
@@ -398,8 +399,8 @@ func GetLength(str string) int {
 	return cnt + 2
 }
 
-func (obj *dataString) GetLength() int {
-	return GetLength(obj.val)
+func (obj *dataString) getLength() int {
+	return getLength(obj.val)
 }
 
 func (obj *dataString) Get() string {
@@ -426,7 +427,7 @@ func CreateArray(initialSize int) DataArray {
 	}
 }
 
-func (obj *dataArray) WriteToBytes(b []byte) (int, error) {
+func (obj *dataArray) writeToBytes(b []byte) (int, error) {
 	lenb := len(b)
 	if lenb < 1 {
 		return -1, errors.New("don't enougth space for store")
@@ -434,7 +435,7 @@ func (obj *dataArray) WriteToBytes(b []byte) (int, error) {
 	b[0] = '['
 	offset := 1
 	for i := 0; i < obj.cnt; i++ {
-		wrt, err := obj.list[i].WriteToBytes(b[offset:])
+		wrt, err := obj.list[i].writeToBytes(b[offset:])
 		if err != nil {
 			return -1, err
 		}
@@ -456,10 +457,10 @@ func (obj *dataArray) WriteToBytes(b []byte) (int, error) {
 
 }
 
-func (obj *dataArray) GetLength() int {
+func (obj *dataArray) getLength() int {
 	cnt := 2
 	for i := 0; i < obj.cnt; i++ {
-		cnt += obj.list[i].GetLength()
+		cnt += obj.list[i].getLength()
 	}
 	if obj.cnt > 1 {
 		cnt += (obj.cnt - 1) * 2
@@ -552,7 +553,7 @@ func CreateDictionary(initialSize int) DataDictionary {
 	}
 }
 
-func (obj *dataDictionary) WriteToBytes(b []byte) (int, error) {
+func (obj *dataDictionary) writeToBytes(b []byte) (int, error) {
 	lenb := len(b)
 	if lenb < 1 {
 		return -1, errors.New("don't enougth space for store")
@@ -562,7 +563,7 @@ func (obj *dataDictionary) WriteToBytes(b []byte) (int, error) {
 	i := 0
 	maplen := len(obj.dict)
 	for k, v := range obj.dict {
-		off, err := WriteToBytes(k, b[offset:])
+		off, err := writeToBytes(k, b[offset:])
 		if err != nil {
 			return 0, err
 		}
@@ -572,7 +573,7 @@ func (obj *dataDictionary) WriteToBytes(b []byte) (int, error) {
 		}
 		b[offset] = ':'
 		offset++
-		off, err = v.WriteToBytes(b[offset:])
+		off, err = v.writeToBytes(b[offset:])
 		if err != nil {
 			return -1, err
 		}
@@ -595,10 +596,10 @@ func (obj *dataDictionary) WriteToBytes(b []byte) (int, error) {
 
 }
 
-func (obj *dataDictionary) GetLength() int {
+func (obj *dataDictionary) getLength() int {
 	cnt := 2
 	for k, v := range obj.dict {
-		cnt += GetLength(k) + 1 + v.GetLength()
+		cnt += getLength(k) + 1 + v.getLength()
 	}
 	if len(obj.dict) > 1 {
 		cnt += (len(obj.dict) - 1) * 2
@@ -636,4 +637,29 @@ func (obj *dataDictionary) Copy() CustomDataType {
 		tmp.Add(k, v.Copy())
 	}
 	return tmp
+}
+
+func ConvertToRASP(data CustomDataType) []byte {
+	switch value := data.(type) {
+	case DataNull:
+		return []byte("$-1\r\n")
+	case *dataString:
+		return []byte("$" + strconv.Itoa(len(value.val)) + "\r\n" + value.val + "\r\n")
+	case *dataInt:
+		return []byte(":" + strconv.Itoa(value.val) + "\r\n")
+	case *dataArray:
+		a := bytes.NewBufferString("*" + strconv.Itoa(value.cnt) + "\r\n")
+		for i := 0; i < value.cnt; i++ {
+			a.Write(ConvertToRASP(value.list[i]))
+		}
+		return a.Bytes()
+	}
+	return []byte("")
+}
+
+func ConvertCommandToRASP(Command string, arguments ...CustomDataType) []byte {
+	arr := CreateArray(1 + len(arguments))
+	arr.Add(CreateString(Command))
+	arr.Add(arguments...)
+	return ConvertToRASP(arr)
 }

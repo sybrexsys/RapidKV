@@ -15,7 +15,6 @@ var srv *server.ServerKV
 
 func main() {
 	sigs := make(chan os.Signal, 1)
-	httpstop = make(chan struct{}, 1)
 	telnetstop = make(chan struct{}, 1)
 
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -25,15 +24,20 @@ func main() {
 		cfg = &defConfig
 	}
 	srv = server.CreateServer()
-	go startHttpListener(cfg)
-	go startTelnetListener(cfg)
+	if cfg.StartAsREST {
+		go startHttpListener(cfg)
+	} else {
+		go startTelnetListener(cfg)
+	}
+
 	go func() {
 		sig := <-sigs
 		fmt.Println()
 		fmt.Println(sig)
 		notifier.Done()
-		httpstop <- struct{}{}
-		telnetstop <- struct{}{}
+		if cfg.StartAsREST {
+			telnetstop <- struct{}{}
+		}
 	}()
 	fmt.Println("awaiting signal")
 	notifier.Wait()
