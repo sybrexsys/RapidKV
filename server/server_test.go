@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"path/filepath"
 	"time"
 
 	"github.com/sybrexsys/RapidKV/datamodel"
@@ -58,4 +59,29 @@ func TestTTL(t *testing.T) {
 	group.Wait()
 	time.Sleep(500 * time.Millisecond)
 	server.Close()
+}
+
+type sss struct {
+	some int
+}
+
+func BenchmarkMove(b *testing.B) {
+	ttt := make(map[string]*sss, b.N)
+	for i := 0; i < b.N; i++ {
+		ttt[strconv.Itoa(i)] = &sss{some: i}
+	}
+	s := make([]string, b.N)
+	t := time.Now()
+	i := 0
+	for k, _ := range ttt {
+		s[i] = k
+		i++
+	}
+	fnd := 0
+	for i := 0; i < b.N; i++ {
+		if f, err := filepath.Match("1*", s[i]); f && err == nil {
+			fnd++
+		}
+	}
+	fmt.Println(b.N, "    ", time.Since(t), "   ", fnd)
 }

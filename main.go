@@ -15,6 +15,9 @@ var srv *server.ServerKV
 
 func main() {
 	sigs := make(chan os.Signal, 1)
+	httpstop = make(chan struct{}, 1)
+	telnetstop = make(chan struct{}, 1)
+
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	notifier.Add(1)
 	cfg, err := loadConfig()
@@ -29,6 +32,8 @@ func main() {
 		fmt.Println()
 		fmt.Println(sig)
 		notifier.Done()
+		httpstop <- struct{}{}
+		telnetstop <- struct{}{}
 	}()
 	fmt.Println("awaiting signal")
 	notifier.Wait()
