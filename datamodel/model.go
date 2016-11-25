@@ -5,10 +5,6 @@ import (
 	"strconv"
 )
 
-/*const (
-    ModelType
-)*/
-
 type CustomDataType interface {
 	getLength() int
 	writeToBytes(b []byte) int
@@ -368,7 +364,7 @@ func (obj *dataString) Set(Value string) {
 }
 
 func (obj *dataString) Copy() CustomDataType {
-	return CreateString(obj.val)
+	return &dataString{val: obj.val, tp: obj.tp}
 }
 
 func (obj *dataString) IsError() bool {
@@ -486,11 +482,11 @@ func (obj *dataArray) Get(Index int) CustomDataType {
 }
 
 func (obj *dataArray) Copy() CustomDataType {
-	l := len(obj.list)
-	tmp := CreateArray(l)
-	for i := 0; i < l; i++ {
+	tmp := CreateArray(obj.cnt)
+	for i := 0; i < obj.cnt; i++ {
 		tmp.Add(obj.list[i].Copy())
 	}
+	tmp.(*dataArray).isNull = obj.isNull
 	return tmp
 }
 

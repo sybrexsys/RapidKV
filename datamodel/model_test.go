@@ -238,13 +238,13 @@ var mustFailObjects = []string{
 }
 
 var mustPassObjects = []string{
+	`"\f"`, `"1 \b"`,
 	`{"a1":[true,null," rt" /* testcomment */],
 			"b2":false//,
 			,
 			//
 			"c3":"testOther"}`,
-	"{}",
-	"[]",
+	"[100,40,-1.5, true]",
 }
 
 func TestParsingObjects(t *testing.T) {
@@ -254,16 +254,24 @@ func TestParsingObjects(t *testing.T) {
 		off := 0
 		_, err := LoadOneJSONObj(data, &off)
 		if err == nil {
-			t.Fatalf("Step %d\r Bellow lexeme must be parsed with error\r%s", i, mustFailObjects[i])
+			t.Fatalf("Step %d\r Bellow object must be parsed with error\r%s", i, mustFailObjects[i])
 		}
 	}
 	for i := 0; i < len(mustPassObjects); i++ {
-		//		fmt.Printf("Step %d\n%s\n", i, mustPassLexeme[i])
+		//		fmt.Printf("Step %d\n%s\n", i, mustPassObjects[i])
 		data := []byte(mustPassObjects[i])
 		off := -1
-		_, err := LoadOneJSONObj(data, &off)
+		obj, err := LoadOneJSONObj(data, &off)
 		if err != nil {
-			t.Fatalf("Step %d\r Bellow lexeme must be parsed without error\r%s\r Bellow error was received \r%s", i, mustPassObjects[i], err.Error())
+			t.Fatalf("Step %d\r Bellow object must be parsed without error\r%s\r Bellow error was received \r%s", i, mustPassObjects[i], err.Error())
+		}
+		//
+		//	fmt.Println(DataObjectToString(obj))
+		src := DataObjectToString(obj)
+		dest := DataObjectToString(obj.Copy())
+		_, isDict := obj.(DataDictionary)
+		if src != dest && !isDict {
+			t.Fatalf("Step %d\r Bellow object must be equeal to its copy \r%s\r%s", i, src, dest)
 		}
 	}
 
@@ -428,15 +436,20 @@ func TestRESPParse(t *testing.T) {
 		data := []byte(mustFailRESP[i])
 		_, err := LoadRESPObj(data)
 		if err == nil {
-			t.Fatalf("Step %d\r Bellow lexeme must be parsed with error\r%s", i, mustFailRESP[i])
+			t.Fatalf("Step %d\r Bellow RESP must be parsed with error\r%s", i, mustFailRESP[i])
 		}
 	}
 	for i := 0; i < len(mustPassRESP); i++ {
 		//	fmt.Printf("Step %d\n%s\n", i, mustPassRESP[i])
 		data := []byte(mustPassRESP[i])
-		_, err := LoadRESPObj(data)
+		obj, err := LoadRESPObj(data)
 		if err != nil {
-			t.Fatalf("Step %d\r Bellow lexeme must be parsed without error\r%s\r Bellow error was received \r%s", i, mustPassRESP[i], err.Error())
+			t.Fatalf("Step %d\r Bellow RESP must be parsed without error\r%s\r Bellow error was received \r%s", i, mustPassRESP[i], err.Error())
+		}
+		dat := string(ConvertToRASP(obj))
+		if dat != mustPassRESP[i] {
+			t.Fatalf("Step %d\r Bellow RESP must be equal\r%s\r%s", i, mustPassRESP[i], dat)
+
 		}
 	}
 
