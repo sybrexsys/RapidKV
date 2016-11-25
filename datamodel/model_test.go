@@ -1,7 +1,7 @@
 package datamodel
 
 import (
-	//"fmt"
+	//	"fmt"
 	"testing"
 	"time"
 )
@@ -9,10 +9,7 @@ import (
 func typeObject(t *testing.T, obj CustomDataType) string {
 	l := obj.getLength()
 	m := make([]byte, l)
-	_, err := obj.writeToBytes(m)
-	if err != nil {
-		t.Fatalf("Calculation returns error: %s", err.Error())
-	}
+	obj.writeToBytes(m)
 	return string(m)
 }
 
@@ -176,6 +173,7 @@ var mustFailLexeme = []string{
 	"abc",
 	`"\`,
 	`"\z"`,
+	"\\s",
 }
 
 var mustPassLexeme = []string{
@@ -256,7 +254,7 @@ func TestParsingObjects(t *testing.T) {
 		off := 0
 		_, err := LoadOneJSONObj(data, &off)
 		if err == nil {
-			t.Fatalf("Step %d\r Bellow lexeme must be parsed with error\r%s", i, mustFailLexeme[i])
+			t.Fatalf("Step %d\r Bellow lexeme must be parsed with error\r%s", i, mustFailObjects[i])
 		}
 	}
 	for i := 0; i < len(mustPassObjects); i++ {
@@ -265,7 +263,7 @@ func TestParsingObjects(t *testing.T) {
 		off := -1
 		_, err := LoadOneJSONObj(data, &off)
 		if err != nil {
-			t.Fatalf("Step %d\r Bellow lexeme must be parsed without error\r%s\r Bellow error was received \r%s", i, mustPassLexeme[i], err.Error())
+			t.Fatalf("Step %d\r Bellow lexeme must be parsed without error\r%s\r Bellow error was received \r%s", i, mustPassObjects[i], err.Error())
 		}
 	}
 
@@ -315,6 +313,131 @@ func TestParsing(t *testing.T) {
 	_, err = LoadJSONObj([]byte(longjson))
 	if err != nil {
 		t.Fatal("Error object must be found")
+	}
+
+}
+
+func BenchmarkParseJson(b *testing.B) {
+	// run the Fib function b.N times
+	t := time.Now()
+	tot := []byte(longjson)
+	for n := 0; n < b.N; n++ {
+		_, err := LoadJSONObj(tot)
+		if err != nil {
+			b.Fatal("Error " + err.Error())
+		}
+	}
+	b.Log("Total time ", b.N, "  processed bytes:", b.N*len(tot), " ", time.Since(t))
+}
+
+func TestLoadAndSave(t *testing.T) {
+	tot := []byte(longjson)
+	offset := 0
+	obj, err := LoadOneJSONObj(tot, &offset)
+	if err != nil {
+		t.Fatal("Error " + err.Error())
+	}
+	l := obj.getLength()
+	m := make([]byte, l)
+	obj.writeToBytes(m)
+}
+
+func BenchmarkSaveJsonOneAlloc(b *testing.B) {
+	tot := []byte(longjson)
+	t := time.Now()
+	offset := 0
+	obj, err := LoadOneJSONObj(tot, &offset)
+	if err != nil {
+		b.Fatal("Error " + err.Error())
+	}
+	l := obj.getLength()
+	m := make([]byte, l)
+	for n := 0; n < b.N; n++ {
+		obj.writeToBytes(m)
+	}
+	b.Log("Total processed bytes:", b.N*l, " ", time.Since(t))
+}
+
+func BenchmarkSaveJsonEachAlloc(b *testing.B) {
+
+	tot := []byte(longjson)
+	t := time.Now()
+	offset := 0
+	obj, err := LoadOneJSONObj(tot, &offset)
+	if err != nil {
+		b.Fatal("Error " + err.Error())
+	}
+	ll := 0
+	for n := 0; n < b.N; n++ {
+		l := obj.getLength()
+		ll += l
+		m := make([]byte, l)
+		obj.writeToBytes(m)
+	}
+	b.Log("Total processed bytes:", ll, " ", time.Since(t))
+}
+
+//RESP section
+
+var mustFailRESP = []string{
+	"a",
+	"\r\n",
+	"+OK",
+	"-ERR",
+	"",
+	"*k",
+	"*true",
+	"*3.14",
+	"*-122",
+	"*3\r10",
+	"*1\r\n:test\r\n",
+	":3.14",
+	":3\r",
+	"$test\r\n",
+	"$1.4\r\n",
+	"$1\rs\r\n",
+	"$10\r\n1231212",
+	"$5\r\nerror\n",
+}
+
+var mustPassRESP = []string{
+	"*2\r\n*3\r\n:1\r\n:2\r\n:3\r\n*2\r\n+Foo\r\n-Bar\r\n",
+	"*-1\r\n",
+	"*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n",
+	"*0\r\n",
+	"+OK\r\n",
+	":1000\r\n",
+	"$6\r\nfoobar\r\n",
+	"$0\r\n\r\n",
+	"$-1\r\n",
+	"*3\r\n:1\r\n:2\r\n:3\r\n",
+	"*5\r\n:1\r\n:2\r\n:3\r\n:4\r\n$6\r\nfoobar\r\n",
+	"*3\r\n$3\r\nfoo\r\n$-1\r\n$3\r\nbar\r\n",
+	"*2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n",
+}
+
+func TestRESPCreate(t *testing.T) {
+	if string(ConvertCommandToRASP("LLEN", CreateString("mylist"))) != "*2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n" {
+		t.Fatal("Invalid result")
+	}
+}
+
+func TestRESPParse(t *testing.T) {
+	for i := 0; i < len(mustFailRESP); i++ {
+		//		fmt.Printf("Step %d\n%s\n", i, mustFailLexeme[i])
+		data := []byte(mustFailRESP[i])
+		_, err := LoadRESPObj(data)
+		if err == nil {
+			t.Fatalf("Step %d\r Bellow lexeme must be parsed with error\r%s", i, mustFailRESP[i])
+		}
+	}
+	for i := 0; i < len(mustPassRESP); i++ {
+		//	fmt.Printf("Step %d\n%s\n", i, mustPassRESP[i])
+		data := []byte(mustPassRESP[i])
+		_, err := LoadRESPObj(data)
+		if err != nil {
+			t.Fatalf("Step %d\r Bellow lexeme must be parsed without error\r%s\r Bellow error was received \r%s", i, mustPassRESP[i], err.Error())
+		}
 	}
 
 }
@@ -737,80 +860,3 @@ var longjson = `
 }
 
 `
-
-func BenchmarkParseJson(b *testing.B) {
-	// run the Fib function b.N times
-	t := time.Now()
-	tot := []byte(longjson)
-	for n := 0; n < b.N; n++ {
-		_, err := LoadJSONObj(tot)
-		if err != nil {
-			b.Fatal("Error " + err.Error())
-		}
-	}
-	b.Log("Total time ", b.N, "  processed bytes:", b.N*len(tot), " ", time.Since(t))
-}
-
-func TestLoadAndSave(t *testing.T) {
-	tot := []byte(longjson)
-	offset := 0
-	obj, err := LoadOneJSONObj(tot, &offset)
-	if err != nil {
-		t.Fatal("Error " + err.Error())
-	}
-	l := obj.getLength()
-	m := make([]byte, l)
-	_, err = obj.writeToBytes(m)
-	if err != nil {
-		t.Fatal("Error " + err.Error())
-	}
-}
-
-func BenchmarkSaveJsonOneAlloc(b *testing.B) {
-	tot := []byte(longjson)
-	t := time.Now()
-	offset := 0
-	obj, err := LoadOneJSONObj(tot, &offset)
-	if err != nil {
-		b.Fatal("Error " + err.Error())
-	}
-	l := obj.getLength()
-	m := make([]byte, l)
-	for n := 0; n < b.N; n++ {
-
-		_, err = obj.writeToBytes(m)
-		if err != nil {
-			b.Fatal("Error " + err.Error())
-		}
-	}
-	b.Log("Total processed bytes:", b.N*l, " ", time.Since(t))
-}
-
-func BenchmarkSaveJsonEachAlloc(b *testing.B) {
-
-	tot := []byte(longjson)
-	t := time.Now()
-	offset := 0
-	obj, err := LoadOneJSONObj(tot, &offset)
-	if err != nil {
-		b.Fatal("Error " + err.Error())
-	}
-	ll := 0
-	for n := 0; n < b.N; n++ {
-		l := obj.getLength()
-		ll += l
-		m := make([]byte, l)
-		_, err = obj.writeToBytes(m)
-		if err != nil {
-			b.Fatal("Error " + err.Error())
-		}
-	}
-	b.Log("Total processed bytes:", ll, " ", time.Since(t))
-}
-
-//RESP section
-func TestRESP(t *testing.T) {
-	if string(ConvertCommandToRASP("LLEN", CreateString("mylist"))) != "*2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n" {
-		t.Fatal("Invalid result")
-	}
-}
