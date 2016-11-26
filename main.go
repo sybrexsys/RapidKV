@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"sync"
@@ -12,6 +13,8 @@ import (
 
 var notifier sync.WaitGroup
 var srv *server.ServerKV
+
+var con net.Conn
 
 func main() {
 	sigs := make(chan os.Signal, 1)
@@ -32,10 +35,13 @@ func main() {
 
 	go func() {
 		sig := <-sigs
-		fmt.Println()
+		fmt.Println("Stop signal was received")
 		fmt.Println(sig)
 		notifier.Done()
 		if cfg.StartAsREST {
+
+		} else {
+			fmt.Println("Stop signal was sent to RESP server")
 			telnetstop <- struct{}{}
 		}
 	}()

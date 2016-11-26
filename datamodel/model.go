@@ -578,6 +578,15 @@ func ConvertToRASP(data CustomDataType) []byte {
 	switch value := data.(type) {
 	case DataNull:
 		return []byte("$-1\r\n")
+	case DataReal:
+		str := DataObjectToString(value)
+		return []byte("$" + strconv.Itoa(len(str)) + "\r\n" + str + "\r\n")
+	case DataDictionary:
+		str := DataObjectToString(value)
+		return []byte("$" + strconv.Itoa(len(str)) + "\r\n" + str + "\r\n")
+	case DataBool:
+		str := DataObjectToString(value)
+		return []byte("$" + strconv.Itoa(len(str)) + "\r\n" + str + "\r\n")
 	case *dataString:
 		switch value.tp {
 		case dsSimple:

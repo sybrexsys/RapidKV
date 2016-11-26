@@ -1,7 +1,9 @@
 package datamodel
 
 import (
-	//	"fmt"
+	"bufio"
+	"bytes"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -388,6 +390,8 @@ func BenchmarkSaveJsonEachAlloc(b *testing.B) {
 //RESP section
 
 var mustFailRESP = []string{
+	"*-4\r\n",
+	"$-100\r\n",
 	"a",
 	"\r\n",
 	"+OK",
@@ -406,6 +410,10 @@ var mustFailRESP = []string{
 	"$1\rs\r\n",
 	"$10\r\n1231212",
 	"$5\r\nerror\n",
+	":alpha",
+	"$2\r\nab",
+	"$alpha\r\nab",
+	"*alpha\r\n",
 }
 
 var mustPassRESP = []string{
@@ -440,7 +448,7 @@ func TestRESPParse(t *testing.T) {
 		}
 	}
 	for i := 0; i < len(mustPassRESP); i++ {
-		//	fmt.Printf("Step %d\n%s\n", i, mustPassRESP[i])
+		//fmt.Printf("Step %d\n%s\n", i, mustPassRESP[i])
 		data := []byte(mustPassRESP[i])
 		obj, err := LoadRESPObj(data)
 		if err != nil {
@@ -453,6 +461,90 @@ func TestRESPParse(t *testing.T) {
 		}
 	}
 
+}
+
+func TestRESPParseIO(t *testing.T) {
+	for i := 0; i < len(mustFailRESP); i++ {
+		//		fmt.Printf("Step %d\n%s\n", i, mustFailLexeme[i])
+		data := []byte(mustFailRESP[i])
+		ioreader := bytes.NewReader(data)
+		bufreader := bufio.NewReader(ioreader)
+		_, _, err := LoadRespFromIO(bufreader, false)
+		if err == nil {
+			t.Fatalf("Step %d\r Bellow RESP must be parsed with error\r%s", i, mustFailRESP[i])
+		}
+	}
+	for i := 0; i < len(mustPassRESP); i++ {
+		//	fmt.Printf("Step %d\n%s\n", i, mustPassRESP[i])
+		data := []byte(mustPassRESP[i])
+		ioreader := bytes.NewReader(data)
+		bufreader := bufio.NewReader(ioreader)
+		obj, _, err := LoadRespFromIO(bufreader, false)
+		if err != nil {
+			t.Fatalf("Step %d\r Bellow RESP must be parsed without error\r%s\r Bellow error was received \r%s", i, mustPassRESP[i], err.Error())
+		}
+		dat := string(ConvertToRASP(obj))
+		if dat != mustPassRESP[i] {
+			t.Fatalf("Step %d\r Bellow RESP must be equal\r%s\r%s", i, mustPassRESP[i], dat)
+
+		}
+	}
+	// here we check parsing of the string with size over bufio size
+	tmpstr := "$" + strconv.Itoa(len(longjson)) + "\r\n" + longjson + "\r\n"
+	data := []byte(tmpstr)
+	ioreader := bytes.NewReader(data)
+	bufreader := bufio.NewReader(ioreader)
+	obj, _, err := LoadRespFromIO(bufreader, false)
+	if err != nil {
+		t.Fatalf("longjson test RESP must be parsed without error\rBellow error was received \r%s", err.Error())
+	}
+	str, ok := obj.(DataString)
+	if !ok {
+		t.Fatal("longjson test must return string object")
+	}
+	resstr := str.Get()
+	if resstr != longjson {
+		i := 0
+		l := 0
+		lsz := len(longjson)
+		rsz := len(resstr)
+		if lsz < rsz {
+			l = lsz
+		} else {
+			l = rsz
+		}
+		for i := 0; i < l; i++ {
+			if longjson[i] != resstr[i] {
+				break
+			}
+		}
+		t.Fatalf("longjson not equal strings (src size: %d dest size: %d difference offset :%d)", lsz, rsz, i)
+	}
+}
+
+func TestRESPParseLazy(t *testing.T) {
+	// check lazy command
+	tmpstr := `Test m "100" 100 120.5 "Test again" RN 11 ZD 12 nil` + "\r\n"
+	data := []byte(tmpstr)
+	ioreader := bytes.NewReader(data)
+	bufreader := bufio.NewReader(ioreader)
+
+	obj, isLazy, err := LoadRespFromIO(bufreader, true)
+	if err != nil {
+		t.Fatalf("lazy RESP must be parsed without error\rBellow error was received \r%s", err.Error())
+	}
+	if !isLazy {
+		t.Fatal("must returns lazy objecy ")
+	}
+	arr, ok := obj.(DataArray)
+	if !ok {
+		t.Fatal("lazy test must return string object")
+	}
+	result := DataObjectToString(arr)
+	mustResult := `["Test", "m", "100", 100, "120.5", "Test again", "RN", 11, "ZD", 12, null]`
+	if result != mustResult {
+		t.Fatalf("Must processeds one command, received enother \r%s\r%s", mustResult, result)
+	}
 }
 
 var longjson = `

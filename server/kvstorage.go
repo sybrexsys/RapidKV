@@ -10,9 +10,9 @@ import (
 	"github.com/sybrexsys/RapidKV/datamodel"
 )
 
-const shardCount = 128
+const shardCount = 1
 
-const ttlCheckPeriod = time.Millisecond * 500
+const ttlCheckPeriod = time.Millisecond * 5000
 
 type kvElementh struct {
 	sync.RWMutex
