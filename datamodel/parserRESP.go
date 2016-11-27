@@ -120,68 +120,74 @@ func loadRESPObj(b []byte, offset *int, lex *lexeme) (CustomDataType, error) {
 }
 
 // LoadRespFromIO parses input reader and returns data object
-func LoadRespFromIO(reader *bufio.Reader, isFirstLayout bool) (CustomDataType, bool, error) {
+func LoadRespFromIO(reader *bufio.Reader, isFirstLayout bool) (CustomDataType, error) {
 	s, err := reader.ReadString(10)
 	if err != nil {
-		return nil, false, err
+		return nil, err
+	}
+	if len(s) < 2 {
+		return nil, ParseError("empty string was detected")
+	}
+	if s[len(s)-2] != '\r' {
+		return nil, ParseError(`\r\n sequence was not found`)
 	}
 	switch s[0] {
 	case ':':
 		tmp, err := strconv.Atoi(s[1 : len(s)-2])
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
-		return CreateInt(tmp), false, nil
+		return CreateInt(tmp), nil
 	case '-':
-		return CreateError(s[1 : len(s)-2]), false, nil
+		return CreateError(s[1 : len(s)-2]), nil
 	case '+':
-		return CreateSimpleString(s[1 : len(s)-2]), false, nil
+		return CreateSimpleString(s[1 : len(s)-2]), nil
 	case '*':
 		tmp, err := strconv.Atoi(s[1 : len(s)-2])
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		if tmp == -1 {
 			tmp := CreateArray(0)
 			tmp.(*dataArray).isNull = true
-			return tmp, false, nil
+			return tmp, nil
 		}
 		if tmp == 0 {
 			tmp := CreateArray(0)
-			return tmp, false, nil
+			return tmp, nil
 		}
 		if tmp < -1 {
-			return nil, false, ParseError("invalid array size was detected")
+			return nil, ParseError("invalid array size was detected")
 		}
 		array := CreateArray(tmp)
 		for i := 0; i < tmp; i++ {
-			data, _, err := LoadRespFromIO(reader, false)
+			data, err := LoadRespFromIO(reader, false)
 			if err != nil {
-				return nil, false, err
+				return nil, err
 			}
 			array.Add(data)
 		}
-		return array, false, nil
+		return array, nil
 	case '$':
 		tmp, err := strconv.Atoi(s[1 : len(s)-2])
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		if tmp == -1 {
-			return CreateNull(), false, nil
+			return CreateNull(), nil
 		}
 		if tmp < -1 {
-			return nil, false, ParseError("invalid size of string")
+			return nil, ParseError("invalid size of string")
 		}
 		if tmp == 0 {
-			return CreateString(""), false, nil
+			return CreateString(""), nil
 		}
 		str := make([]byte, tmp)
 		buf := str[:]
 		for {
 			n, err := reader.Read(buf)
 			if err != nil {
-				return nil, false, err
+				return nil, err
 			}
 			if n == len(buf) {
 				break
@@ -190,18 +196,17 @@ func LoadRespFromIO(reader *bufio.Reader, isFirstLayout bool) (CustomDataType, b
 		}
 		s, err := reader.ReadString(10)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		if s != "\r\n" {
-			return nil, false, ParseError("unknown token was found")
+			return nil, ParseError("unknown token was found")
 		}
-		return CreateString(string(str)), false, nil
+		return CreateString(string(str)), nil
 	}
 	if !isFirstLayout {
-		return nil, false, ParseError("unknown token was detected")
+		return nil, ParseError("unknown token was detected")
 	}
-	obj, err := processLazyString(s)
-	return obj, true, err
+	return processLazyString(s)
 }
 
 func processLazyString(str string) (CustomDataType, error) {

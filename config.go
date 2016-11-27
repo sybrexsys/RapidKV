@@ -5,8 +5,12 @@ type config struct {
 	StartAsREST bool
 }
 
-var defConfig = config{}
+var defConfig = config{
+	Port:        18018,
+	StartAsREST: false,
+}
 
 func loadConfig() (*config, error) {
-	return &config{}, nil
+
+	return &defConfig, nil
 }

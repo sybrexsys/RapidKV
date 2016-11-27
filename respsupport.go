@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"runtime"
-	"time"
 
 	"github.com/sybrexsys/RapidKV/datamodel"
 )
@@ -95,10 +94,7 @@ func saveOneDataToOut(answer datamodel.CustomDataType, writer *bufio.Writer) err
 }
 
 func processRESPConnection(c net.Conn) {
-	var (
-		answer datamodel.CustomDataType
-		err    error
-	)
+
 	defer func() {
 		if e := recover(); e != nil {
 			buf := make([]byte, 4096)
@@ -107,7 +103,9 @@ func processRESPConnection(c net.Conn) {
 			log.Fatalf("client run panic %s:%v", buf, e)
 		}
 		c.Close()
+		notifier.Done()
 	}()
+	notifier.Add(1)
 	reader := bufio.NewReader(c)
 	writer := bufio.NewWriter(c)
 	cc := &clientConnection{
@@ -115,7 +113,7 @@ func processRESPConnection(c net.Conn) {
 		answersSize: 0,
 	}
 	for {
-		_, err = reader.ReadByte()
+		_, err := reader.ReadByte()
 		if err != nil {
 			if err != io.EOF {
 				return
@@ -131,21 +129,16 @@ func processRESPConnection(c net.Conn) {
 		} else {
 			reader.UnreadByte()
 		}
-		request, isLazy, erro := datamodel.LoadRespFromIO(reader, true)
+		request, erro := datamodel.LoadRespFromIO(reader, true)
 		if err != nil {
 			parseError, ok := erro.(datamodel.ParseError)
 			if !ok {
 				return
 			}
-			answer = datamodel.CreateError(parseError.Error())
+			answer := datamodel.CreateError(parseError.Error())
 			cc.pushAnswer(answer)
 		}
-		if isLazy {
-			answer, err = processOneRESPCommand(request)
-
-		} else {
-			answer, err = processLazyCommand(request)
-		}
+		answer, err := processLazyCommand(request)
 		if err != nil {
 			return
 		}
@@ -153,42 +146,28 @@ func processRESPConnection(c net.Conn) {
 	}
 }
 
-func startTelnetListener(cfg *config) {
-	fmt.Println("telnet started")
+func startRESPListener() {
 	defer func() {
-		fmt.Println("stopped telnet server...")
+		fmt.Println("stopped RESP server...")
 		notifier.Done()
 	}()
 	notifier.Add(1)
-	listener, err := net.Listen("tcp", "localhost:8000")
-	if err != nil {
-		log.Fatal("Telnet listener was not created")
-		return
-	}
-	ls, ok := listener.(*net.TCPListener)
-	if !ok {
-		log.Fatal("invalid listener was created for telnet connection")
-	}
+
 mainloop:
 	for {
-		ls.SetDeadline(time.Now().Add(time.Millisecond * 200))
-		conn, err := ls.Accept()
+		conn, err := tcplistener.Accept()
 		select {
-		case <-telnetstop:
-			fmt.Println("stop signal was received")
+		case <-quit:
+			fmt.Println("listener stop signal was received")
+			if err != nil {
+				fmt.Println(err.Error())
+			}
 			break mainloop
 		default:
 		}
 		if err != nil {
-			netErr, ok := err.(net.Error)
-			//If this is a timeout, then continue to wait for
-			//new connections
-			if ok && netErr.Timeout() && netErr.Temporary() {
-				continue
-			} else {
-				fmt.Println(err.Error())
-				return
-			}
+			fmt.Println(err.Error())
+			return
 		}
 		go processRESPConnection(conn)
 	}

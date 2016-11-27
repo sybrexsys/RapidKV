@@ -436,6 +436,12 @@ func TestRESPCreate(t *testing.T) {
 	if string(ConvertCommandToRASP("LLEN", CreateString("mylist"))) != "*2\r\n$4\r\nLLEN\r\n$6\r\nmylist\r\n" {
 		t.Fatal("Invalid result")
 	}
+	array := CreateArray(10)
+	array.Add(CreateDictionary(10), CreateBool(true), CreateReal(3.14))
+	res := string(ConvertToRASP(array))
+	if res != "*3\r\n$2\r\n{}\r\n$4\r\ntrue\r\n$4\r\n3.14\r\n" {
+		t.Fatal("invalid concersion to RESP was found")
+	}
 }
 
 func TestRESPParse(t *testing.T) {
@@ -469,7 +475,7 @@ func TestRESPParseIO(t *testing.T) {
 		data := []byte(mustFailRESP[i])
 		ioreader := bytes.NewReader(data)
 		bufreader := bufio.NewReader(ioreader)
-		_, _, err := LoadRespFromIO(bufreader, false)
+		_, err := LoadRespFromIO(bufreader, false)
 		if err == nil {
 			t.Fatalf("Step %d\r Bellow RESP must be parsed with error\r%s", i, mustFailRESP[i])
 		}
@@ -479,7 +485,7 @@ func TestRESPParseIO(t *testing.T) {
 		data := []byte(mustPassRESP[i])
 		ioreader := bytes.NewReader(data)
 		bufreader := bufio.NewReader(ioreader)
-		obj, _, err := LoadRespFromIO(bufreader, false)
+		obj, err := LoadRespFromIO(bufreader, false)
 		if err != nil {
 			t.Fatalf("Step %d\r Bellow RESP must be parsed without error\r%s\r Bellow error was received \r%s", i, mustPassRESP[i], err.Error())
 		}
@@ -494,7 +500,7 @@ func TestRESPParseIO(t *testing.T) {
 	data := []byte(tmpstr)
 	ioreader := bytes.NewReader(data)
 	bufreader := bufio.NewReader(ioreader)
-	obj, _, err := LoadRespFromIO(bufreader, false)
+	obj, err := LoadRespFromIO(bufreader, false)
 	if err != nil {
 		t.Fatalf("longjson test RESP must be parsed without error\rBellow error was received \r%s", err.Error())
 	}
@@ -529,12 +535,9 @@ func TestRESPParseLazy(t *testing.T) {
 	ioreader := bytes.NewReader(data)
 	bufreader := bufio.NewReader(ioreader)
 
-	obj, isLazy, err := LoadRespFromIO(bufreader, true)
+	obj, err := LoadRespFromIO(bufreader, true)
 	if err != nil {
 		t.Fatalf("lazy RESP must be parsed without error\rBellow error was received \r%s", err.Error())
-	}
-	if !isLazy {
-		t.Fatal("must returns lazy objecy ")
 	}
 	arr, ok := obj.(DataArray)
 	if !ok {
