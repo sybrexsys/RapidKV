@@ -12,7 +12,6 @@ import (
 
 	"strconv"
 
-	"github.com/sybrexsys/RapidKV/database"
 	"github.com/sybrexsys/RapidKV/datamodel"
 )
 
@@ -22,7 +21,7 @@ type clientConnection struct {
 	answers         []datamodel.CustomDataType
 	answersSize     int
 	needQuit        bool
-	currentDatabase *database.Database
+	currentDatabase *Database
 	authorized      bool
 	inMulti         bool
 	queue           datamodel.DataArray

@@ -9,22 +9,20 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
-
-	"github.com/sybrexsys/RapidKV/database"
 )
 
 var (
 	notifier      sync.WaitGroup
 	dbProtect     sync.RWMutex
-	databases     map[int]*database.Database
-	firstDatabase *database.Database
+	databases     map[int]*Database
+	firstDatabase *Database
 	tcplistener   *net.TCPListener
 	quit          chan struct{}
 	needAuth      bool
 	cfg           *config
 )
 
-func getDataBase(index int) *database.Database {
+func getDataBase(index int) *Database {
 	dbProtect.RLock()
 	db, ok := databases[index]
 	if ok {
@@ -39,7 +37,7 @@ func getDataBase(index int) *database.Database {
 		dbProtect.RUnlock()
 		return db
 	}
-	tmp := database.CreateDatabase(cfg.ShardCount)
+	tmp := CreateDatabase(cfg.ShardCount)
 	databases[index] = tmp
 	return tmp
 }
@@ -52,8 +50,8 @@ func main() {
 	if err != nil {
 		cfg = &defConfig
 	}
-	databases = make(map[int]*database.Database)
-	firstDatabase = database.CreateDatabase(cfg.ShardCount)
+	databases = make(map[int]*Database)
+	firstDatabase = CreateDatabase(cfg.ShardCount)
 	databases[0] = firstDatabase
 	needAuth = cfg.AuthPass != ""
 

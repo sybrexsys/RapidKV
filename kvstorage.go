@@ -1,4 +1,4 @@
-package database
+package main
 
 import (
 	"hash/crc64"
@@ -155,7 +155,7 @@ func (db *Database) SetValue(Key string, Value datamodel.CustomDataType, state i
 		elem.Ttl = t
 		return oldValue, true
 	}
-	if state == SetIfNotExists {
+	if state == SetIfExists {
 		return nil, false
 	}
 

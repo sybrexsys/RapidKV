@@ -3,7 +3,6 @@ package main
 import (
 	"strconv"
 
-	"github.com/sybrexsys/RapidKV/database"
 	"github.com/sybrexsys/RapidKV/datamodel"
 )
 
@@ -11,7 +10,7 @@ type commandError string
 
 func (conerr commandError) Error() string { return string(conerr) }
 
-type databasefunc func(*database.Database, datamodel.DataArray) datamodel.CustomDataType
+type databasefunc func(*Database, datamodel.DataArray) datamodel.CustomDataType
 
 var commandList = map[string]databasefunc{
 	//keys
@@ -31,30 +30,21 @@ var commandList = map[string]databasefunc{
 	"type":      typeCommand,
 
 	//strings
-	"append":      appendCommand,
-	"bitcount":    nil,
-	"bitfield":    nil,
-	"bitop":       nil,
-	"bitops":      nil,
-	"decr":        nil,
-	"decrby":      nil,
-	"get":         getCommand,
-	"getbit":      nil,
-	"getrange":    nil,
-	"getset":      nil,
-	"incr":        nil,
-	"incrby":      nil,
-	"incrbyfloat": nil,
-	"mget":        nil,
-	"mset":        nil,
-	"msetnx":      nil,
-	"psetex":      nil,
-	"set":         setCommand,
-	"setbit":      nil,
-	"setex":       nil,
-	"setnx":       nil,
-	"setrange":    nil,
-	"strlen":      nil,
+	"append": appendCommand,
+	"decr":   decrCommand,
+	"decrby": decrbyCommand,
+	"get":    getCommand,
+	"getset": getsetCommand,
+	"incr":   incrCommand,
+	"incrby": incrbyCommand,
+	"mget":   mgetCommand,
+	"mset":   msetCommand,
+	"msetnx": msetnxCommand,
+	"psetex": psetexCommand,
+	"set":    setCommand,
+	"setex":  setexCommand,
+	"setnx":  setnxCommand,
+	"strlen": strlenCommand,
 
 	//hashes
 	"hdel":         nil,
@@ -72,6 +62,22 @@ var commandList = map[string]databasefunc{
 	"hstrlen":      nil,
 	"hvals":        nil,
 	"hscan":        nil,
+
+	//lists
+
+	"lindex":  lindexCommand,
+	"linsert": linsertCommand,
+	"llen":    llenCommand,
+	"lpop":    lpopCommand,
+	"lpush":   lpushCommand,
+	"lpushx":  lpushxCommand,
+	"lrange":  lrangeCommand,
+	"lrem":    nil,
+	"lset":    lsetCommand,
+	"ltrim":   ltrimCommand,
+	"rpop":    rpopCommand,
+	"rpush":   rpushCommand,
+	"rpushx":  rpushxCommand,
 
 	//sets
 	"sadd":        nil,

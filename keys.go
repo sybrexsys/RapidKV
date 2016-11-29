@@ -1,11 +1,10 @@
 package main
 
 import (
-	"github.com/sybrexsys/RapidKV/database"
 	"github.com/sybrexsys/RapidKV/datamodel"
 )
 
-func keysCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func keysCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	key, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
@@ -13,7 +12,7 @@ func keysCommand(db *database.Database, command datamodel.DataArray) datamodel.C
 	return db.GetKeys(key)
 }
 
-func typeCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func typeCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	key, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
@@ -34,7 +33,7 @@ func typeCommand(db *database.Database, command datamodel.DataArray) datamodel.C
 	}
 }
 
-func delCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func delCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	deleted := 0
 	cnt := command.Count()
 	for i := 1; i < cnt; i++ {
@@ -49,7 +48,7 @@ func delCommand(db *database.Database, command datamodel.DataArray) datamodel.Cu
 	return datamodel.CreateInt(deleted)
 }
 
-func existsCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func existsCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	exists := 0
 	cnt := command.Count()
 	for i := 1; i < cnt; i++ {
@@ -64,7 +63,7 @@ func existsCommand(db *database.Database, command datamodel.DataArray) datamodel
 	return datamodel.CreateInt(exists)
 }
 
-func renameCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func renameCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	oldkey, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
@@ -80,7 +79,7 @@ func renameCommand(db *database.Database, command datamodel.DataArray) datamodel
 	return datamodel.CreateSimpleString("OK")
 }
 
-func renamenxCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func renamenxCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	oldkey, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
@@ -96,7 +95,7 @@ func renamenxCommand(db *database.Database, command datamodel.DataArray) datamod
 	return datamodel.CreateInt(res)
 }
 
-func persistCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func persistCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	key, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
@@ -107,7 +106,7 @@ func persistCommand(db *database.Database, command datamodel.DataArray) datamode
 	return datamodel.CreateInt(0)
 }
 
-func ttlCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func ttlCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	key, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
@@ -122,7 +121,7 @@ func ttlCommand(db *database.Database, command datamodel.DataArray) datamodel.Cu
 	return datamodel.CreateInt(ttl / 1000)
 }
 
-func pttlCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func pttlCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	key, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
@@ -137,7 +136,7 @@ func pttlCommand(db *database.Database, command datamodel.DataArray) datamodel.C
 	return datamodel.CreateInt(ttl)
 }
 
-func moveCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func moveCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	key, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
@@ -154,7 +153,7 @@ func moveCommand(db *database.Database, command datamodel.DataArray) datamodel.C
 	return datamodel.CreateInt(0)
 }
 
-func expireCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func expireCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	key, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
@@ -178,7 +177,7 @@ func expireCommand(db *database.Database, command datamodel.DataArray) datamodel
 	return datamodel.CreateInt(0)
 }
 
-func pexpireCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func pexpireCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	key, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
@@ -202,7 +201,7 @@ func pexpireCommand(db *database.Database, command datamodel.DataArray) datamode
 	return datamodel.CreateInt(0)
 }
 
-func expireatCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func expireatCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	key, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
@@ -226,7 +225,7 @@ func expireatCommand(db *database.Database, command datamodel.DataArray) datamod
 	return datamodel.CreateInt(0)
 }
 
-func pexpireatCommand(db *database.Database, command datamodel.DataArray) datamodel.CustomDataType {
+func pexpireatCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
 	key, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
