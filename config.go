@@ -10,11 +10,10 @@ type config struct {
 var defConfig = config{
 	Port:        18018,
 	StartAsREST: false,
-	AuthPass:    "",
+	AuthPass:    "test",
 	ShardCount:  32,
 }
 
 func loadConfig() (*config, error) {
-
 	return &defConfig, nil
 }

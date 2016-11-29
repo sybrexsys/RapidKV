@@ -7,10 +7,11 @@ import (
 	"bytes"
 
 	"fmt"
-	"github.com/sybrexsys/RapidKV/datamodel"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/sybrexsys/RapidKV/datamodel"
 )
 
 var commands = []string{
@@ -63,9 +64,6 @@ var commands = []string{
 	"exists 200",
 	"1",
 
-	"rename",
-	`"ERR Unknown parameter"`,
-
 	"rename 100",
 	`"ERR Unknown parameter"`,
 
@@ -74,9 +72,6 @@ var commands = []string{
 
 	"rename 200 100",
 	`"OK"`,
-
-	"renamenx",
-	`"ERR Unknown parameter"`,
 
 	"renamenx 100",
 	`"ERR Unknown parameter"`,
@@ -93,17 +88,11 @@ var commands = []string{
 	"renamenx 100 220",
 	`1`,
 
-	"persist",
-	`"ERR Unknown parameter"`,
-
 	"persist 20",
 	`0`,
 
 	"persist 250",
 	`0`,
-
-	"ttl",
-	`"ERR Unknown parameter"`,
 
 	"ttl 2",
 	`-2`,
@@ -113,9 +102,6 @@ var commands = []string{
 
 	"persist 220",
 	`1`,
-
-	"pttl",
-	`"ERR Unknown parameter"`,
 
 	"pttl 2",
 	`-2`,
@@ -135,9 +121,6 @@ var commands = []string{
 	"select 0",
 	`"OK"`,
 
-	"move",
-	`"ERR Unknown parameter"`,
-
 	"move 1",
 	`"ERR Unknown parameter"`,
 
@@ -149,9 +132,6 @@ var commands = []string{
 
 	"set 1 1",
 	`"OK"`,
-
-	"expire",
-	`"ERR Unknown parameter"`,
 
 	"expire key a",
 	`"ERR Unknown parameter"`,
@@ -186,9 +166,6 @@ var commands = []string{
 	"pexpire 220 1",
 	"0",
 
-	"pexpire",
-	`"ERR Unknown parameter"`,
-
 	"pexpire key a",
 	`"ERR Unknown parameter"`,
 
@@ -210,9 +187,6 @@ var commands = []string{
 	"pexpireat 220 1",
 	"0",
 
-	"pexpireat",
-	`"ERR Unknown parameter"`,
-
 	"pexpireat key a",
 	`"ERR Unknown parameter"`,
 
@@ -233,9 +207,6 @@ var commands = []string{
 
 	"expireat 220 1",
 	"0",
-
-	"expireat",
-	`"ERR Unknown parameter"`,
 
 	"expireat key a",
 	`"ERR Unknown parameter"`,
@@ -294,9 +265,6 @@ var commands = []string{
 	"quit",
 	`"OK"`,
 
-	"append",
-	`"ERR Unknown parameter"`,
-
 	"append 30",
 	`"ERR Unknown parameter"`,
 
@@ -305,9 +273,6 @@ var commands = []string{
 
 	`append 30 " world"`,
 	`11`,
-
-	`set`,
-	`"ERR Unknown parameter"`,
 
 	`set 32`,
 	`"ERR Unknown parameter"`,
@@ -330,6 +295,9 @@ var commands = []string{
 	`set 32 33 ex 100`,
 	`"OK"`,
 
+	`set 32 33 px 100`,
+	`"OK"`,
+
 	`set 32 33 px`,
 	`"ERR Syntax error"`,
 
@@ -338,9 +306,6 @@ var commands = []string{
 
 	`set 32 33 px -100`,
 	`"ERR Syntax error"`,
-
-	`set 32 33 px 100`,
-	`"OK"`,
 
 	`set key1 "Hello"`,
 	`"OK"`,
@@ -351,6 +316,9 @@ var commands = []string{
 	`mget key1 key2 nonexisting`,
 	`["Hello", "World", null]`,
 
+	`exists key1 key2 nonexisting`,
+	`2`,
+
 	`mset key1 key2 nonexisting`,
 	`"ERR Wrong count of the parameters"`,
 
@@ -360,32 +328,14 @@ var commands = []string{
 	`get a100`,
 	`null`,
 
-	"*2\r\n$4\r\nmget\r\n*0\r\n",
-	`[null]`,
-
 	"*4\r\n$3\r\nset\r\n$3\r\nset\r\n$3\r\nset\r\n*0\r\n",
 	`"ERR Unknown parameter"`,
 
 	`strlen a100`,
 	`0`,
 
-	`strlen`,
-	`"ERR Unknown parameter"`,
-
 	`strlen key2`,
 	`5`,
-
-	`incr`,
-	`"ERR Unknown parameter"`,
-
-	`decr`,
-	`"ERR Unknown parameter"`,
-
-	`incrby`,
-	`"ERR Unknown parameter"`,
-
-	`decrby`,
-	`"ERR Unknown parameter"`,
 
 	`incrby q`,
 	`"ERR Unknown parameter"`,
@@ -462,9 +412,6 @@ var commands = []string{
 	`setnx 122 22`,
 	`0`,
 
-	`setnx`,
-	`"ERR Unknown parameter"`,
-
 	`setnx 122 `,
 	`"ERR Unknown parameter"`,
 
@@ -474,13 +421,7 @@ var commands = []string{
 	`getset 2s2 1`,
 	`null`,
 
-	`getset`,
-	`"ERR Unknown parameter"`,
-
 	`getset 122 `,
-	`"ERR Unknown parameter"`,
-
-	`setex`,
 	`"ERR Unknown parameter"`,
 
 	`setex 122 22`,
@@ -494,9 +435,6 @@ var commands = []string{
 
 	`setex 122s 10 zzz`,
 	`"OK"`,
-
-	`psetex`,
-	`"ERR Unknown parameter"`,
 
 	`psetex 122 22`,
 	`"ERR Syntax error"`,
@@ -516,14 +454,8 @@ var commands = []string{
 	`rpush zaqz 1 2 3`,
 	`3`,
 
-	`rpush`,
-	`"ERR Unknown parameter"`,
-
 	`rpush 122s 1 2 3`,
 	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
-
-	`lpush`,
-	`"ERR Unknown parameter"`,
 
 	`lpush 122s 1 2 3`,
 	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
@@ -533,11 +465,6 @@ var commands = []string{
 
 	`rpop key0`,
 	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
-
-	`rpop`,
-	`"ERR Unknown parameter"`,
-	`lpop`,
-	`"ERR Unknown parameter"`,
 
 	`rpop zaq`,
 	`"1"`,
@@ -557,9 +484,6 @@ var commands = []string{
 	`lpop zad`,
 	`null`,
 
-	`llen`,
-	`"ERR Unknown parameter"`,
-
 	`llen key0`,
 	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
 
@@ -569,26 +493,21 @@ var commands = []string{
 	`llen zadzssss`,
 	`0`,
 
-	"ltrim",
-	`"ERR Unknown parameter"`,
-
-	"ltrim zor",
-	`"OK"`,
-
-	`lrange`,
-	`"ERR Unknown parameter"`,
-
 	`lrange a`,
 	`"ERR Unknown parameter"`,
+
 	`lrange a b`,
 	`"ERR Unknown parameter"`,
+
 	`lrange a 1`,
 	`"ERR Unknown parameter"`,
+
 	`lrange a -100 -1`,
 	`[]`,
 
 	"rpush list 1 2 3 4 5 6 7",
 	"7",
+
 	`lrange list -100 -1`,
 	`["1", "2", "3", "4", "5", "6", "7"]`,
 
@@ -607,9 +526,6 @@ var commands = []string{
 	`lrange list 5 -100`,
 	`[]`,
 
-	"rpushx",
-	`"ERR Unknown parameter"`,
-
 	"rpushx key0 a",
 	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
 
@@ -618,9 +534,6 @@ var commands = []string{
 
 	"rpushx list 1 ",
 	`8`,
-
-	"lpushx",
-	`"ERR Unknown parameter"`,
 
 	"lpushx key0 a",
 	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
@@ -631,8 +544,311 @@ var commands = []string{
 	"lpushx list 1 ",
 	`9`,
 
-	
+	"mset q1 q1 q2 q2 q3 q3 ",
+	`"OK"`,
 
+	"del q1 q2 q3",
+	"3",
+
+	"lpush t1 1",
+	"1",
+
+	"lpop t1",
+	`"1"`,
+
+	"lpop t1",
+	`null`,
+
+	"rpop t1",
+	`null`,
+
+	`lrange list -100 -1`,
+	`["1", "1", "2", "3", "4", "5", "6", "7", "1"]`,
+
+	"lindex list -1 ",
+	`"1"`,
+
+	"lindex list a ",
+	`"ERR Unknown parameter"`,
+
+	"lindex alist 1",
+	`null`,
+
+	"lindex key0 1",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"linsert list before 3 three",
+	"10",
+
+	"linsert list after 3 three",
+	"11",
+
+	`lrange list -100 -1`,
+	`["1", "1", "2", "three", "3", "three", "4", "5", "6", "7", "1"]`,
+
+	"linsert list here 3 three",
+	`"ERR Unknown parameter"`,
+
+	"linsert listnor after 3 three",
+	"0",
+
+	"linsert list before ",
+	`"ERR Unknown parameter"`,
+
+	"linsert list before 3",
+	`"ERR Unknown parameter"`,
+
+	"linsert key0 before 3 6",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"linsert list after 43 three",
+	"-1",
+
+	"ltrim key0 1 1",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"ltrim list before",
+	`"ERR Unknown parameter"`,
+
+	"ltrim list 1 before",
+	`"ERR Unknown parameter"`,
+
+	"ltrim list 1 1",
+	`"OK"`,
+
+	`lrange list -100 -1`,
+	`["1", "2", "three", "3", "three", "4", "5", "6", "7", "1"]`,
+
+	"ltrim list -2 -1",
+	`"OK"`,
+
+	`lrange list -100 -1`,
+	`["1", "2", "three", "3", "three", "4", "5", "6"]`,
+
+	"ltrim list -100 -100",
+	`"OK"`,
+
+	`lrange list -100 -1`,
+	`["2", "three", "3", "three", "4", "5", "6"]`,
+
+	"ltrim list 100 -100",
+	`"OK"`,
+
+	`lrange list -100 -1`,
+	`[]`,
+
+	"rpush list 1 2 3 4 5 6 7",
+	"7",
+
+	`lrange list -100 -1`,
+	`["1", "2", "3", "4", "5", "6", "7"]`,
+
+	`lset a`,
+	`"ERR Unknown parameter"`,
+
+	`lset a 2`,
+	`"ERR Unknown parameter"`,
+
+	`lset list 2 a`,
+	`"OK"`,
+
+	`lrange list -100 -1`,
+	`["1", "2", "a", "4", "5", "6", "7"]`,
+
+	`lset nolist 2 a`,
+	`"ERR No such key"`,
+
+	`lset key0 2 a`,
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	`lset list -12 a`,
+	`"ERR Out of range"`,
+
+	`select 2`,
+	`"OK"`,
+
+	"rpush list 1 2 3 4 5 6 7",
+	"7",
+
+	"hset hash field1 Hello",
+	"1",
+
+	"hset hash ",
+	`"ERR Unknown parameter"`,
+
+	"hset hash field1 ",
+	`"ERR Unknown parameter"`,
+
+	"hset list field1 Hello",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"hdel hash ",
+	`"ERR Unknown parameter"`,
+
+	"hdel list field1 Hello",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"hdel hash field2 Hello",
+	"0",
+
+	"hdel hash field1 Hello",
+	"1",
+
+	"hdel hashwrong field1 Hello",
+	"0",
+
+	"hset hash field1 Hello",
+	"1",
+
+	"hset hash field2 World",
+	"1",
+
+	"hdel hash field2 field1",
+	"2",
+
+	"hkeys hash",
+	"[]",
+
+	"hkeys hashwrong",
+	"[]",
+
+	"hkeys list",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"hset hash field1 Hello",
+	"1",
+
+	"hset hash field2 World",
+	"1",
+
+	"hdel hash field2 ",
+	"1",
+
+	"hvals hash",
+	`["Hello"]`,
+
+	"hvals hashwrong",
+	"[]",
+
+	"hvals list",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"hexists hash",
+	`"ERR Unknown parameter"`,
+
+	"hexists hashs 100",
+	`0`,
+
+	"hexists list 100",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"hexists hash 100",
+	`0`,
+
+	"hexists hash field1",
+	`1`,
+
+	"hget hash",
+	`"ERR Unknown parameter"`,
+
+	"hget hashs 100",
+	`null`,
+
+	"hget list 100",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"hget hash field1",
+	`"Hello"`,
+
+	"hlen hash",
+	`1`,
+
+	"hlen hashs",
+	`0`,
+
+	"hlen list",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"hstrlen hash",
+	`"ERR Unknown parameter"`,
+
+	"hstrlen hashs 100",
+	`0`,
+
+	"hstrlen list 100",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"hstrlen hash field1",
+	`5`,
+
+	"hstrlen hash field10",
+	`0`,
+
+	"hgetall hash",
+	`["field1", "Hello"]`,
+
+	"hgetall hashwrong",
+	"[]",
+
+	"hgetall list",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"hsetnx hash100 field1 Hello",
+	"1",
+
+	"hsetnx hash100 field1 World",
+	"0",
+
+	"hsetnx list field2 World",
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	"hsetnx hash",
+	`"ERR Unknown parameter"`,
+
+	"hsetnx hash 100",
+	`"ERR Unknown parameter"`,
+
+	`hincrby hash test 5`,
+	`5`,
+
+	`hincrby hash1 test 5`,
+	`5`,
+
+	`hincrby hash1 test 5`,
+	`10`,
+
+	`hincrby hash field1 5`,
+	`"ERR value is not an integer or out of range"`,
+
+	`hincrby list test 5`,
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	`hincrby hash `,
+	`"ERR Unknown parameter"`,
+
+	`hincrby hash test ss`,
+	`"ERR Unknown parameter"`,
+
+	`hmget hash test testempty`,
+	`["5", null]`,
+
+	`hmget list test testempty`,
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	`hmget hash12 test testempty`,
+	`[]`,
+
+	`hmset newhash`,
+	`"ERR Invalid syntax"`,
+
+	`hmset newhash eles`,
+	`"ERR Invalid syntax"`,
+
+	`hmset list eles ss`,
+	`"WRONGTYPE Operation against a key holding the wrong kind of value"`,
+
+	`hmset new eles ss`,
+	`"OK"`,
 }
 
 func Get(i int, t *testing.T) datamodel.CustomDataType {

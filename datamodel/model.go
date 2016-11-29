@@ -58,6 +58,7 @@ type DataDictionary interface {
 	Add(Key string, Value CustomDataType)
 	Delete(Key string)
 	Value(Key string) CustomDataType
+	Keys() DataArray
 }
 
 func DataObjectToString(obj CustomDataType) string {
@@ -560,12 +561,21 @@ func (obj *dataDictionary) Add(Key string, Value CustomDataType) {
 func (obj *dataDictionary) Delete(Key string) {
 	delete(obj.dict, Key)
 }
+
 func (obj *dataDictionary) Value(Key string) CustomDataType {
 	Value, ok := obj.dict[Key]
 	if !ok {
 		return CreateNull()
 	}
 	return Value
+}
+
+func (obj *dataDictionary) Keys() DataArray {
+	arr := CreateArray(len(obj.dict))
+	for key := range obj.dict {
+		arr.Add(CreateString(key))
+	}
+	return arr
 }
 
 func (obj *dataDictionary) Copy() CustomDataType {

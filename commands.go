@@ -10,7 +10,7 @@ type commandError string
 
 func (conerr commandError) Error() string { return string(conerr) }
 
-type databasefunc func(*Database, datamodel.DataArray) datamodel.CustomDataType
+type databasefunc func(*Database, string, datamodel.DataArray) datamodel.CustomDataType
 
 var commandList = map[string]databasefunc{
 	//keys
@@ -47,21 +47,19 @@ var commandList = map[string]databasefunc{
 	"strlen": strlenCommand,
 
 	//hashes
-	"hdel":         nil,
-	"hexists":      nil,
-	"hget":         nil,
-	"hgetall":      nil,
-	"hincrby":      nil,
-	"hincrbyfloat": nil,
-	"hkeys":        nil,
-	"hlen":         nil,
-	"hmget":        nil,
-	"hmset":        nil,
-	"hset":         nil,
-	"hsetnx":       nil,
-	"hstrlen":      nil,
-	"hvals":        nil,
-	"hscan":        nil,
+	"hdel":    hdelCommand,
+	"hexists": hexistsCommand,
+	"hget":    hgetCommand,
+	"hgetall": hgetallCommand,
+	"hincrby": hincrbyCommand,
+	"hkeys":   hkeysCommand,
+	"hlen":    hlenCommand,
+	"hmget":   hmgetCommand,
+	"hmset":   hmsetCommand,
+	"hset":    hsetCommand,
+	"hsetnx":  hsetnxCommand,
+	"hstrlen": hstrlenCommand,
+	"hvals":   hvalsCommand,
 
 	//lists
 
@@ -107,5 +105,16 @@ func getKey(command datamodel.DataArray, idx int) (string, error) {
 	default:
 		return "", commandError("Unknown parameter")
 	}
+}
 
+func getInt(command datamodel.DataArray, idx int) (int, error) {
+	a := command.Get(idx)
+	switch value := a.(type) {
+	case datamodel.DataString:
+		return strconv.Atoi(value.Get())
+	case datamodel.DataInt:
+		return value.Get(), nil
+	default:
+		return -1, commandError("Unknown parameter")
+	}
 }

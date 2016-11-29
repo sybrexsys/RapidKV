@@ -18,12 +18,12 @@ func newClientHTTP(w http.ResponseWriter, r *http.Request) {
 		notifier.Done()
 	}()
 	notifier.Add(1)
-	w.Write([]byte("Test Passed"))
+	w.Write([]byte("Http server is not implemented yet..."))
 }
 
 func startHttpListener() {
 	defer func() {
-		fmt.Println("stopped RESP server...")
+		fmt.Println("stopped REST server...")
 		notifier.Done()
 	}()
 	notifier.Add(1)

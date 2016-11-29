@@ -1,15 +1,12 @@
 package main
 
 import (
-	"github.com/sybrexsys/RapidKV/datamodel"
 	"strings"
+
+	"github.com/sybrexsys/RapidKV/datamodel"
 )
 
-func lpushCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
+func lpushCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	return db.ProcessValue(key, true, func(elem *Element) (datamodel.CustomDataType, bool) {
 		var arr datamodel.DataArray
 		if elem.Value == nil {
@@ -23,7 +20,7 @@ func lpushCommand(db *Database, command datamodel.DataArray) datamodel.CustomDat
 			}
 		}
 
-		for i := 2; i < command.Count(); i++ {
+		for i := 0; i < command.Count(); i++ {
 			newval, err := getKey(command, i)
 			if err != nil {
 				return datamodel.CreateError("ERR Unknown parameter"), false
@@ -35,11 +32,7 @@ func lpushCommand(db *Database, command datamodel.DataArray) datamodel.CustomDat
 	})
 }
 
-func rpushCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
+func rpushCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	return db.ProcessValue(key, true, func(elem *Element) (datamodel.CustomDataType, bool) {
 		var arr datamodel.DataArray
 		if elem.Value == nil {
@@ -53,7 +46,7 @@ func rpushCommand(db *Database, command datamodel.DataArray) datamodel.CustomDat
 			}
 		}
 
-		for i := 2; i < command.Count(); i++ {
+		for i := 0; i < command.Count(); i++ {
 			newval, err := getKey(command, i)
 			if err != nil {
 				return datamodel.CreateError("ERR Unknown parameter"), false
@@ -65,13 +58,7 @@ func rpushCommand(db *Database, command datamodel.DataArray) datamodel.CustomDat
 	})
 }
 
-func rpopCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
-
+func rpopCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	res := db.ProcessValue(key, true, func(elem *Element) (datamodel.CustomDataType, bool) {
 		var arr datamodel.DataArray
 		if elem.Value == nil {
@@ -94,11 +81,7 @@ func rpopCommand(db *Database, command datamodel.DataArray) datamodel.CustomData
 	return res
 }
 
-func lpopCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
+func lpopCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	res := db.ProcessValue(key, true, func(elem *Element) (datamodel.CustomDataType, bool) {
 		var arr datamodel.DataArray
 		if elem.Value == nil {
@@ -121,11 +104,7 @@ func lpopCommand(db *Database, command datamodel.DataArray) datamodel.CustomData
 	return res
 }
 
-func lpushxCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
+func lpushxCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	return db.ProcessValue(key, true, func(elem *Element) (datamodel.CustomDataType, bool) {
 		var arr datamodel.DataArray
 		if elem.Value == nil {
@@ -137,7 +116,7 @@ func lpushxCommand(db *Database, command datamodel.DataArray) datamodel.CustomDa
 			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value"), false
 		}
 
-		newval, err := getKey(command, 2)
+		newval, err := getKey(command, 0)
 		if err != nil {
 			return datamodel.CreateError("ERR Unknown parameter"), false
 		}
@@ -148,11 +127,7 @@ func lpushxCommand(db *Database, command datamodel.DataArray) datamodel.CustomDa
 	})
 }
 
-func rpushxCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
+func rpushxCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	return db.ProcessValue(key, true, func(elem *Element) (datamodel.CustomDataType, bool) {
 		var arr datamodel.DataArray
 		if elem.Value == nil {
@@ -164,7 +139,7 @@ func rpushxCommand(db *Database, command datamodel.DataArray) datamodel.CustomDa
 			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value"), false
 		}
 
-		newval, err := getKey(command, 2)
+		newval, err := getKey(command, 0)
 		if err != nil {
 			return datamodel.CreateError("ERR Unknown parameter"), false
 		}
@@ -175,11 +150,7 @@ func rpushxCommand(db *Database, command datamodel.DataArray) datamodel.CustomDa
 	})
 }
 
-func llenCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
+func llenCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	val, isval := db.GetValue(key)
 	if !isval {
 		return datamodel.CreateInt(0)
@@ -191,16 +162,12 @@ func llenCommand(db *Database, command datamodel.DataArray) datamodel.CustomData
 	return datamodel.CreateInt(arr.Count())
 }
 
-func lindexCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
+func lindexCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+	idx, err := getInt(command, 0)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
-	val := command.Get(2)
-	c, isInt := val.(datamodel.DataInt)
-	if !isInt {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
+
 	val, isval := db.GetValue(key)
 	if !isval {
 		return datamodel.CreateNull()
@@ -209,19 +176,15 @@ func lindexCommand(db *Database, command datamodel.DataArray) datamodel.CustomDa
 	if !okstr {
 		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
 	}
-	idx := c.Get()
+
 	if idx < 0 {
 		idx = arr.Count() + idx
 	}
 	return arr.Get(idx).Copy()
 }
 
-func linsertCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
-	loc, err := getKey(command, 2)
+func linsertCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+	loc, err := getKey(command, 0)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
@@ -234,18 +197,18 @@ func linsertCommand(db *Database, command datamodel.DataArray) datamodel.CustomD
 	} else {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
-	search, err := getKey(command, 3)
+	search, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
-	value, err := getKey(command, 4)
+	value, err := getKey(command, 2)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
 	return db.ProcessValue(key, true, func(elem *Element) (datamodel.CustomDataType, bool) {
 		var arr datamodel.DataArray
 		if elem.Value == nil {
-			return datamodel.CreateInt(-1), false
+			return datamodel.CreateInt(0), false
 		}
 
 		arr, ok := elem.Value.(datamodel.DataArray)
@@ -266,7 +229,7 @@ func linsertCommand(db *Database, command datamodel.DataArray) datamodel.CustomD
 			}
 		}
 		if idx == -1 {
-			return datamodel.CreateInt(0), false
+			return datamodel.CreateInt(-1), false
 		}
 		if !isbefore {
 			idx++
@@ -277,8 +240,12 @@ func linsertCommand(db *Database, command datamodel.DataArray) datamodel.CustomD
 	})
 }
 
-func ltrimCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
+func ltrimCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+	fromval, err := getInt(command, 0)
+	if err != nil {
+		return datamodel.CreateError("ERR Unknown parameter")
+	}
+	toval, err := getInt(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
@@ -292,18 +259,7 @@ func ltrimCommand(db *Database, command datamodel.DataArray) datamodel.CustomDat
 		if !ok {
 			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value"), false
 		}
-		val := command.Get(2)
-		c, isInt := val.(datamodel.DataInt)
-		if !isInt {
-			return datamodel.CreateError("ERR Unknown parameter"), false
-		}
-		fromval := c.Get()
-		val = command.Get(2)
-		c, isInt = val.(datamodel.DataInt)
-		if !isInt {
-			return datamodel.CreateError("ERR Unknown parameter"), false
-		}
-		toval := c.Get()
+
 		cnt := arr.Count()
 		if fromval < 0 {
 			fromval = cnt + fromval
@@ -330,17 +286,13 @@ func ltrimCommand(db *Database, command datamodel.DataArray) datamodel.CustomDat
 	})
 }
 
-func lsetCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
+func lsetCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+	idx, err := getInt(command, 0)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
-	val := command.Get(2)
-	c, isInt := val.(datamodel.DataInt)
-	if !isInt {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
-	value, err := getKey(command, 3)
+
+	value, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
@@ -357,7 +309,7 @@ func lsetCommand(db *Database, command datamodel.DataArray) datamodel.CustomData
 		}
 
 		cnt := arr.Count()
-		idx := c.Get()
+
 		if idx < 0 {
 			idx = cnt - idx
 		}
@@ -371,24 +323,16 @@ func lsetCommand(db *Database, command datamodel.DataArray) datamodel.CustomData
 	})
 }
 
-func lrangeCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
+func lrangeCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+	fromval, err := getInt(command, 0)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
-	val := command.Get(2)
-	c, isInt := val.(datamodel.DataInt)
-	if !isInt {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
-	fromval := c.Get()
 
-	val = command.Get(3)
-	c, isInt = val.(datamodel.DataInt)
-	if !isInt {
+	toval, err := getInt(command, 1)
+	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
-	toval := c.Get()
 
 	val, isval := db.GetValue(key)
 	if !isval {

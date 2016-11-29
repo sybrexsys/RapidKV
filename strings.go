@@ -3,15 +3,12 @@ package main
 import (
 	"strings"
 
-	"github.com/sybrexsys/RapidKV/datamodel"
 	"strconv"
+
+	"github.com/sybrexsys/RapidKV/datamodel"
 )
 
-func getCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
+func getCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	val, isval := db.GetValue(key)
 	if !isval {
 		return datamodel.CreateNull()
@@ -23,14 +20,17 @@ func getCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataT
 	return val.Copy()
 }
 
-func mgetCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
+func mgetCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	cnt := command.Count()
-	arr := datamodel.CreateArray(cnt - 1)
-	for i := 1; i < cnt; i++ {
-		key, err := getKey(command, i)
-		if err != nil {
-			arr.Add(datamodel.CreateNull())
-			continue
+	arr := datamodel.CreateArray(cnt + 1)
+	for i := -1; i < cnt; i++ {
+		if i >= 0 {
+			var err error
+			key, err = getKey(command, i)
+			if err != nil {
+				arr.Add(datamodel.CreateNull())
+				continue
+			}
 		}
 		val, isval := db.GetValue(key)
 		if !isval {
@@ -47,16 +47,13 @@ func mgetCommand(db *Database, command datamodel.DataArray) datamodel.CustomData
 	return arr
 }
 
-func setCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
+func setCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+
+	value, err := getKey(command, 0)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
-	value, err := getKey(command, 2)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
-	if command.Count() == 3 {
+	if command.Count() == 1 {
 		db.SetValue(key, datamodel.CreateString(value), SetAny, 0)
 		return datamodel.CreateSimpleString("OK")
 	}
@@ -67,7 +64,7 @@ func setCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataT
 		timeoutPx     int
 	)
 
-	for i := 3; i < command.Count(); i++ {
+	for i := 1; i < command.Count(); i++ {
 		option, err := getKey(command, i)
 		if err != nil {
 			return datamodel.CreateError("ERR Unknown parameter")
@@ -81,12 +78,11 @@ func setCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataT
 			if i+1 == command.Count() {
 				return datamodel.CreateError("ERR Syntax error")
 			}
-			val := command.Get(i + 1)
-			z, ok := val.(datamodel.DataInt)
-			if !ok {
+			z, err := getInt(command, i+1)
+			if err != nil {
 				return datamodel.CreateError("ERR Syntax error")
 			}
-			timeoutEx = z.Get() * 1000
+			timeoutEx = z * 1000
 			if timeoutEx <= 0 {
 				return datamodel.CreateError("ERR Syntax error")
 			}
@@ -95,12 +91,11 @@ func setCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataT
 			if i+1 == command.Count() {
 				return datamodel.CreateError("ERR Syntax error")
 			}
-			val := command.Get(i + 1)
-			z, ok := val.(datamodel.DataInt)
-			if !ok {
+			z, err := getInt(command, i+1)
+			if err != nil {
 				return datamodel.CreateError("ERR Syntax error")
 			}
-			timeoutPx = z.Get()
+			timeoutPx = z
 			if timeoutPx <= 0 {
 				return datamodel.CreateError("ERR Syntax error")
 			}
@@ -122,7 +117,7 @@ func setCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataT
 	return datamodel.CreateSimpleString("OK")
 }
 
-func msetCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
+func msetCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	db.RUnlock()
 	db.Lock()
 	defer func() {
@@ -132,10 +127,13 @@ func msetCommand(db *Database, command datamodel.DataArray) datamodel.CustomData
 	if command.Count()&1 != 1 {
 		return datamodel.CreateError("ERR Wrong count of the parameters")
 	}
-	for i := 1; i < command.Count(); i += 2 {
-		key, err := getKey(command, i)
-		if err != nil {
-			return datamodel.CreateError("ERR Unknown parameter")
+	for i := -1; i < command.Count(); i += 2 {
+		if i > 0 {
+			var err error
+			key, err = getKey(command, i)
+			if err != nil {
+				return datamodel.CreateError("ERR Unknown parameter")
+			}
 		}
 		value, err := getKey(command, i+1)
 		if err != nil {
@@ -146,7 +144,7 @@ func msetCommand(db *Database, command datamodel.DataArray) datamodel.CustomData
 	return datamodel.CreateSimpleString("OK")
 }
 
-func msetnxCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
+func msetnxCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	db.RUnlock()
 	db.Lock()
 	defer func() {
@@ -157,10 +155,13 @@ func msetnxCommand(db *Database, command datamodel.DataArray) datamodel.CustomDa
 	if command.Count()&1 != 1 {
 		return datamodel.CreateError("ERR Wrong count of the parameters")
 	}
-	for i := 1; i < command.Count(); i += 2 {
-		key, err := getKey(command, i)
-		if err != nil {
-			return datamodel.CreateError("ERR Unknown parameter")
+	for i := -1; i < command.Count(); i += 2 {
+		if i > 0 {
+			var err error
+			key, err = getKey(command, i)
+			if err != nil {
+				return datamodel.CreateError("ERR Unknown parameter")
+			}
 		}
 		value, err := getKey(command, i+1)
 		if err != nil {
@@ -174,12 +175,8 @@ func msetnxCommand(db *Database, command datamodel.DataArray) datamodel.CustomDa
 	return datamodel.CreateInt(all)
 }
 
-func appendCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
-	value, err := getKey(command, 2)
+func appendCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+	value, err := getKey(command, 0)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
@@ -198,21 +195,16 @@ func appendCommand(db *Database, command datamodel.DataArray) datamodel.CustomDa
 	})
 }
 
-func setexCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
+func setexCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+	timeout, err := getInt(command, 0)
 	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
-	timeout := command.Get(2)
-	z, ok := timeout.(datamodel.DataInt)
-	if !ok {
 		return datamodel.CreateError("ERR Syntax error")
 	}
-	timeoutEx := z.Get() * 1000
+	timeoutEx := timeout * 1000
 	if timeoutEx <= 0 {
 		return datamodel.CreateError("ERR Syntax error")
 	}
-	value, err := getKey(command, 3)
+	value, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Syntax error")
 	}
@@ -220,21 +212,15 @@ func setexCommand(db *Database, command datamodel.DataArray) datamodel.CustomDat
 	return datamodel.CreateSimpleString("OK")
 }
 
-func psetexCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
+func psetexCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+	timeoutEx, err := getInt(command, 0)
 	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
-	timeout := command.Get(2)
-	z, ok := timeout.(datamodel.DataInt)
-	if !ok {
 		return datamodel.CreateError("ERR Syntax error")
 	}
-	timeoutEx := z.Get()
 	if timeoutEx <= 0 {
 		return datamodel.CreateError("ERR Syntax error")
 	}
-	value, err := getKey(command, 3)
+	value, err := getKey(command, 1)
 	if err != nil {
 		return datamodel.CreateError("ERR Syntax error")
 	}
@@ -242,12 +228,8 @@ func psetexCommand(db *Database, command datamodel.DataArray) datamodel.CustomDa
 	return datamodel.CreateSimpleString("OK")
 }
 
-func setnxCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
-	value, err := getKey(command, 2)
+func setnxCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+	value, err := getKey(command, 0)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
@@ -258,12 +240,8 @@ func setnxCommand(db *Database, command datamodel.DataArray) datamodel.CustomDat
 	return datamodel.CreateInt(1)
 }
 
-func getsetCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
-	value, err := getKey(command, 2)
+func getsetCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+	value, err := getKey(command, 0)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
@@ -304,53 +282,31 @@ func ariphmeticCommand(db *Database, key string, value int) datamodel.CustomData
 	})
 }
 
-func incrCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
+func incrCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	return ariphmeticCommand(db, key, 1)
 }
 
-func decrCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
+func decrCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	return ariphmeticCommand(db, key, -1)
 }
 
-func incrbyCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
+func incrbyCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+	val, err := getInt(command, 0)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
-	val := command.Get(2)
-	c, isInt := val.(datamodel.DataInt)
-	if !isInt {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
-	return ariphmeticCommand(db, key, c.Get())
+	return ariphmeticCommand(db, key, val)
 }
 
-func decrbyCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
+func decrbyCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
+	val, err := getInt(command, 0)
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
-	val := command.Get(2)
-	c, isInt := val.(datamodel.DataInt)
-	if !isInt {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
-	return ariphmeticCommand(db, key, -c.Get())
+	return ariphmeticCommand(db, key, -val)
 }
 
-func strlenCommand(db *Database, command datamodel.DataArray) datamodel.CustomDataType {
-	key, err := getKey(command, 1)
-	if err != nil {
-		return datamodel.CreateError("ERR Unknown parameter")
-	}
+func strlenCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	val, isval := db.GetValue(key)
 	if !isval {
 		return datamodel.CreateInt(0)

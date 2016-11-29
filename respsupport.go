@@ -80,10 +80,20 @@ func (cc *clientConnection) processOneRESPCommandWithoutLock(command datamodel.D
 	if needAuth && !cc.authorized {
 		return datamodel.CreateError("ERR Not authorized")
 	}
+
 	if f == nil {
 		return datamodel.CreateError("ERR Command not implemented")
 	}
-	return f(cc.currentDatabase, command)
+	if command.Count() < 2 {
+		return datamodel.CreateError("ERR Unknown parameter")
+	}
+	key, err := getKey(command, 1)
+	if err != nil {
+		return datamodel.CreateError("ERR Unknown parameter")
+	}
+	command.Remove(0)
+	command.Remove(0)
+	return f(cc.currentDatabase, key, command)
 }
 
 func (cc *clientConnection) processTransaction() datamodel.CustomDataType {
@@ -183,9 +193,18 @@ func processRESPConnection(c net.Conn) {
 		currentDatabase: firstDatabase,
 		authorized:      !needAuth,
 	}
+	go func() {
+		<-quit
+		c.SetReadDeadline(time.Now().Add(0))
+	}()
 	for {
 		c.SetReadDeadline(time.Now().Add(time.Millisecond * 200))
 		ch, err := reader.ReadByte()
+		select {
+		case <-quit:
+			return
+		default:
+		}
 		if err != nil {
 			netErr, ok := err.(net.Error)
 			if ok && netErr.Timeout() && netErr.Temporary() {
@@ -202,6 +221,7 @@ func processRESPConnection(c net.Conn) {
 				continue
 			} else {
 				reader.UnreadByte()
+				c.SetReadDeadline(time.Now().Add(time.Second * 50))
 			}
 		}
 		request, err = datamodel.LoadRespFromIO(reader, true)
@@ -267,12 +287,11 @@ func quitCommand(cc *clientConnection, command datamodel.DataArray) datamodel.Cu
 }
 
 func selectCommand(cc *clientConnection, command datamodel.DataArray) datamodel.CustomDataType {
-	item := command.Get(1)
-	idx, ok := item.(datamodel.DataInt)
-	if !ok {
+	idx, err := getInt(command, 1)
+	if err != nil {
 		return datamodel.CreateError("ERR Invalid parameter")
 	}
-	cc.currentDatabase = getDataBase(idx.Get())
+	cc.currentDatabase = getDataBase(idx)
 	return datamodel.CreateSimpleString("OK")
 }
 
