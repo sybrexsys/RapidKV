@@ -1,32 +1,48 @@
-package server
+package database
 
 import (
 	"fmt"
 	"strconv"
 	"sync"
 	"testing"
-
-	"path/filepath"
 	"time"
 
 	"github.com/sybrexsys/RapidKV/datamodel"
 )
 
 func TestStartStop(t *testing.T) {
-	server := CreateServer()
-	server.Close()
+	database := CreateDatabase(32)
+	database.Close()
+}
+
+func TestGetSet(t *testing.T) {
+	database := CreateDatabase(10)
+	database.SetValue("100", datamodel.CreateString("test"), 0, 0)
+	keys := datamodel.DataObjectToString(database.GetKeys("*"))
+	if keys != `["100"]` {
+		t.Fatal("invalid key was found")
+	}
+	get, a := database.GetValue("100")
+	if !a {
+		t.Fatal("value was not found")
+	}
+	res := datamodel.DataObjectToString(get)
+	if res != `"test"` {
+		t.Fatal("invalid value by key was found")
+	}
+	database.Close()
 }
 
 func BenchmarkSetGet(b *testing.B) {
 	treats := b.N
-	server := CreateServer()
+	server := CreateDatabase(32)
 	var group sync.WaitGroup
 	group.Add(treats + 1)
 	go func() {
 		for i := 0; i < treats; i++ {
 			go func(a int) {
 				for i := 0; i < 1000; i++ {
-					server.SetValue("test"+strconv.Itoa(a<<32+i), datamodel.CreateInt(a<<32+i), int64(a))
+					server.SetValue("test"+strconv.Itoa(a<<32+i), datamodel.CreateInt(a<<32+i), 0, 0)
 				}
 				group.Done()
 			}(i)
@@ -38,9 +54,9 @@ func BenchmarkSetGet(b *testing.B) {
 	server.Close()
 }
 
-func TestTTL(t *testing.T) {
+func TrestTTL(t *testing.T) {
 	treats := 50
-	server := CreateServer()
+	server := CreateDatabase(32)
 	var group sync.WaitGroup
 	group.Add(treats + 1)
 	go func() {
@@ -48,8 +64,8 @@ func TestTTL(t *testing.T) {
 			go func(a int) {
 				for i := 0; i < 100; i++ {
 					key := "test" + strconv.Itoa(a<<32+i)
-					server.SetValue(key, datamodel.CreateInt(a<<32+i), int64(a))
-					server.SetTTL(key, 100*a, int64(a))
+					server.SetValue(key, datamodel.CreateInt(a<<32+i), 0, 0)
+					server.SetTTL(key, 100*a)
 				}
 				group.Done()
 			}(i)
@@ -59,29 +75,4 @@ func TestTTL(t *testing.T) {
 	group.Wait()
 	time.Sleep(500 * time.Millisecond)
 	server.Close()
-}
-
-type sss struct {
-	some int
-}
-
-func BenchmarkMove(b *testing.B) {
-	ttt := make(map[string]*sss, b.N)
-	for i := 0; i < b.N; i++ {
-		ttt[strconv.Itoa(i)] = &sss{some: i}
-	}
-	s := make([]string, b.N)
-	t := time.Now()
-	i := 0
-	for k, _ := range ttt {
-		s[i] = k
-		i++
-	}
-	fnd := 0
-	for i := 0; i < b.N; i++ {
-		if f, err := filepath.Match("1*", s[i]); f && err == nil {
-			fnd++
-		}
-	}
-	fmt.Println(b.N, "    ", time.Since(t), "   ", fnd)
 }

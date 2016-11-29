@@ -317,7 +317,7 @@ func getLexeme(b []byte, offset *int, lex *lexeme) error {
 		i := 0
 		for {
 			if i == 5 {
-				return ParseError("unknow token was found")
+				return ParseError("unknown token was found")
 			}
 			buf[i] = ch
 			*offset++
@@ -350,7 +350,7 @@ func getLexeme(b []byte, offset *int, lex *lexeme) error {
 			return nil
 		}
 	}
-	return ParseError("unknow token was found")
+	return ParseError("unknown token was found")
 }
 
 func processArray(b []byte, offset *int, lex *lexeme) (DataArray, error) {
@@ -454,7 +454,7 @@ func parseObj(b []byte, offset *int, lex *lexeme) (obj CustomDataType, er error)
 			return back(smCloseDictionary), nil
 		}
 	}
-	return nil, ParseError("unknow lexeme was found")
+	return nil, ParseError("unknown lexeme was found")
 }
 
 func LoadJSONObj(b []byte) (obj CustomDataType, er error) {

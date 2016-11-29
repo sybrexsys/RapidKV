@@ -10,25 +10,52 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/sybrexsys/RapidKV/server"
+	"github.com/sybrexsys/RapidKV/database"
 )
 
 var (
-	notifier    sync.WaitGroup
-	srv         *server.ServerKV
-	tcplistener *net.TCPListener
-	quit        chan struct{}
+	notifier      sync.WaitGroup
+	dbProtect     sync.RWMutex
+	databases     map[int]*database.Database
+	firstDatabase *database.Database
+	tcplistener   *net.TCPListener
+	quit          chan struct{}
+	needAuth      bool
+	cfg           *config
 )
+
+func getDataBase(index int) *database.Database {
+	dbProtect.RLock()
+	db, ok := databases[index]
+	if ok {
+		dbProtect.RUnlock()
+		return db
+	}
+	dbProtect.RUnlock()
+	dbProtect.Lock()
+	defer dbProtect.Unlock()
+	db, ok = databases[index]
+	if ok {
+		dbProtect.RUnlock()
+		return db
+	}
+	tmp := database.CreateDatabase(cfg.ShardCount)
+	databases[index] = tmp
+	return tmp
+}
 
 func main() {
 	sigs := make(chan os.Signal, 1)
 	quit = make(chan struct{}, 1)
-
-	cfg, err := loadConfig()
+	var err error
+	cfg, err = loadConfig()
 	if err != nil {
 		cfg = &defConfig
 	}
-	srv = server.CreateServer()
+	databases = make(map[int]*database.Database)
+	firstDatabase = database.CreateDatabase(cfg.ShardCount)
+	databases[0] = firstDatabase
+	needAuth = cfg.AuthPass != ""
 
 	listener, err := net.Listen("tcp", "localhost:"+strconv.Itoa(cfg.Port))
 	if err != nil {
@@ -60,5 +87,7 @@ func main() {
 	}()
 	notifier.Wait()
 	fmt.Println("exiting")
-	srv.Close()
+	for _, db := range databases {
+		db.Close()
+	}
 }

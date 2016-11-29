@@ -4,18 +4,28 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"runtime"
+	"strings"
 
+	"time"
+
+	"strconv"
+
+	"github.com/sybrexsys/RapidKV/database"
 	"github.com/sybrexsys/RapidKV/datamodel"
 )
 
 var telnetstop chan struct{}
 
 type clientConnection struct {
-	answers     []datamodel.CustomDataType
-	answersSize int
+	answers         []datamodel.CustomDataType
+	answersSize     int
+	needQuit        bool
+	currentDatabase *database.Database
+	authorized      bool
+	inMulti         bool
+	queue           datamodel.DataArray
 }
 
 func (cc *clientConnection) setCapacity(newCapacity int) {
@@ -62,19 +72,78 @@ func (cc *clientConnection) popAnswers(writer *bufio.Writer) error {
 	return nil
 }
 
-func readOneRecord(reader *bufio.Reader) (datamodel.CustomDataType, error) {
-
-	return nil, nil
-
+func (cc *clientConnection) processOneRESPCommandWithoutLock(command datamodel.DataArray) datamodel.CustomDataType {
+	comName := command.Get(0).(datamodel.DataString).Get()
+	f, ok := commandList[strings.ToLower(comName)]
+	if !ok {
+		return datamodel.CreateError("ERR Unknown command")
+	}
+	if needAuth && !cc.authorized {
+		return datamodel.CreateError("ERR Not authorized")
+	}
+	if f == nil {
+		return datamodel.CreateError("ERR Command not implemented")
+	}
+	return f(cc.currentDatabase, command)
 }
 
-func processOneRESPCommand(command datamodel.CustomDataType) (datamodel.CustomDataType, error) {
-
-	return nil, nil
+func (cc *clientConnection) processTransaction() datamodel.CustomDataType {
+	cnt := cc.queue.Count()
+	answers := datamodel.CreateArray(cnt)
+	cc.currentDatabase.Lock()
+	defer func() {
+		cc.inMulti = false
+		cc.queue = datamodel.CreateArray(10)
+		cc.currentDatabase.Unlock()
+	}()
+	for i := 0; i < cnt; i++ {
+		answers.Add(cc.processOneRESPCommandWithoutLock(cc.queue.Get(i).(datamodel.DataArray)))
+	}
+	return answers
 }
 
-func processLazyCommand(command datamodel.CustomDataType) (datamodel.CustomDataType, error) {
-	return nil, nil
+func (cc *clientConnection) processOneRESPCommand(command datamodel.CustomDataType) datamodel.CustomDataType {
+	arr, ok := command.(datamodel.DataArray)
+	if !ok {
+		return datamodel.CreateError("ERR Invalid command")
+	}
+	if arr.Count() < 1 {
+		return datamodel.CreateError("ERR Invalid command")
+	}
+	comdat := arr.Get(0)
+	str, okstr := comdat.(datamodel.DataString)
+	if !okstr {
+		return datamodel.CreateError("ERR Invalid command")
+	}
+	commandName := strings.ToLower(str.Get())
+
+	concom, isConnectionCommand := connectionCommands[commandName]
+	if isConnectionCommand {
+		if concom.needAuth && !cc.authorized {
+			return datamodel.CreateError("ERR Not authorized")
+		}
+		return concom.function(cc, arr)
+	}
+	if commandName == "multi" {
+		cc.queue = datamodel.CreateArray(10)
+		cc.inMulti = true
+		return datamodel.CreateSimpleString("OK")
+	}
+	if commandName == "discard" {
+		cc.inMulti = false
+		cc.queue = datamodel.CreateArray(10)
+		return datamodel.CreateSimpleString("OK")
+	}
+	if commandName == "exec" {
+		return cc.processTransaction()
+	}
+	if cc.inMulti {
+		cc.queue.Add(command)
+		return datamodel.CreateSimpleString("QUEUED")
+	}
+	cc.currentDatabase.RLock()
+	defer cc.currentDatabase.RUnlock()
+	return cc.processOneRESPCommandWithoutLock(arr)
 }
 
 func checkEOF(reader *bufio.Reader) (bool, error) {
@@ -90,17 +159,18 @@ func checkEOF(reader *bufio.Reader) (bool, error) {
 }
 
 func saveOneDataToOut(answer datamodel.CustomDataType, writer *bufio.Writer) error {
-	return nil
+	_, err := writer.Write(datamodel.ConvertToRASP(answer))
+	return err
 }
 
 func processRESPConnection(c net.Conn) {
-
+	var request datamodel.CustomDataType
 	defer func() {
 		if e := recover(); e != nil {
 			buf := make([]byte, 4096)
 			n := runtime.Stack(buf, false)
 			buf = buf[0:n]
-			log.Fatalf("client run panic %s:%v", buf, e)
+			fmt.Printf("client run panic %s:%v\rLast command to server was:%s", buf, e, datamodel.DataObjectToString(request))
 		}
 		c.Close()
 		notifier.Done()
@@ -109,40 +179,47 @@ func processRESPConnection(c net.Conn) {
 	reader := bufio.NewReader(c)
 	writer := bufio.NewWriter(c)
 	cc := &clientConnection{
-		answers:     make([]datamodel.CustomDataType, 100),
-		answersSize: 0,
+		answers:         make([]datamodel.CustomDataType, 100),
+		answersSize:     0,
+		currentDatabase: firstDatabase,
+		authorized:      !needAuth,
 	}
 	for {
-		_, err := reader.ReadByte()
+		c.SetReadDeadline(time.Now().Add(time.Millisecond * 200))
+		ch, err := reader.ReadByte()
 		if err != nil {
-			if err != io.EOF {
-				return
-			}
-			if cc.answersSize != 0 {
-				if cc.popAnswers(writer) != nil {
-					return
+			netErr, ok := err.(net.Error)
+			if ok && netErr.Timeout() && netErr.Temporary() {
+				if cc.answersSize != 0 {
+					if cc.popAnswers(writer) != nil {
+						return
+					}
 				}
-			} else {
-				runtime.Gosched()
+				continue
 			}
-			continue
 		} else {
-			reader.UnreadByte()
+			if ch == '\r' {
+				reader.ReadBytes(10)
+				continue
+			} else {
+				reader.UnreadByte()
+			}
 		}
-		request, erro := datamodel.LoadRespFromIO(reader, true)
+		request, err = datamodel.LoadRespFromIO(reader, true)
 		if err != nil {
-			parseError, ok := erro.(datamodel.ParseError)
+			parseError, ok := err.(datamodel.ParseError)
 			if !ok {
 				return
 			}
 			answer := datamodel.CreateError(parseError.Error())
 			cc.pushAnswer(answer)
 		}
-		answer, err := processLazyCommand(request)
-		if err != nil {
-			return
-		}
+		answer := cc.processOneRESPCommand(request)
 		cc.pushAnswer(answer)
+		if cc.needQuit {
+			cc.popAnswers(writer)
+			break
+		}
 	}
 }
 
@@ -159,9 +236,6 @@ mainloop:
 		select {
 		case <-quit:
 			fmt.Println("listener stop signal was received")
-			if err != nil {
-				fmt.Println(err.Error())
-			}
 			break mainloop
 		default:
 		}
@@ -171,4 +245,85 @@ mainloop:
 		}
 		go processRESPConnection(conn)
 	}
+}
+
+func authCommand(cc *clientConnection, command datamodel.DataArray) datamodel.CustomDataType {
+	if needAuth {
+		item := command.Get(1)
+		str, ok := item.(datamodel.DataString)
+		if !ok {
+			datamodel.CreateError("ERR Invalid parameter")
+		}
+		cc.authorized = str.Get() == cfg.AuthPass
+		if !cc.authorized {
+			return datamodel.CreateError("ERR Invalid password")
+		}
+	}
+	return datamodel.CreateSimpleString("OK")
+}
+
+func quitCommand(cc *clientConnection, command datamodel.DataArray) datamodel.CustomDataType {
+	cc.needQuit = true
+	return datamodel.CreateSimpleString("OK")
+}
+
+func selectCommand(cc *clientConnection, command datamodel.DataArray) datamodel.CustomDataType {
+	item := command.Get(1)
+	idx, ok := item.(datamodel.DataInt)
+	if !ok {
+		return datamodel.CreateError("ERR Invalid parameter")
+	}
+	cc.currentDatabase = getDataBase(idx.Get())
+	return datamodel.CreateSimpleString("OK")
+}
+
+func echoCommand(cc *clientConnection, command datamodel.DataArray) datamodel.CustomDataType {
+	key, err := getKey(command, 1)
+	if err != nil {
+		return datamodel.CreateError("ERR Invalid parameter")
+	}
+	return datamodel.CreateString(key)
+
+}
+
+func pingCommand(cc *clientConnection, command datamodel.DataArray) datamodel.CustomDataType {
+	item := command.Get(1)
+	switch value := item.(type) {
+	case datamodel.DataNull:
+		return datamodel.CreateSimpleString("PONG")
+	case datamodel.DataString:
+		return datamodel.CreateString(value.Get())
+	case datamodel.DataInt:
+		return datamodel.CreateString(strconv.Itoa(value.Get()))
+	default:
+		return datamodel.CreateError("ERR Invalid parameter")
+	}
+}
+
+type connectionCommand struct {
+	needAuth bool
+	function func(cc *clientConnection, command datamodel.DataArray) datamodel.CustomDataType
+}
+
+var connectionCommands = map[string]connectionCommand{
+	"auth": {
+		needAuth: false,
+		function: authCommand,
+	},
+	"select": {
+		needAuth: true,
+		function: selectCommand,
+	},
+	"echo": {
+		needAuth: false,
+		function: echoCommand,
+	},
+	"ping": {
+		needAuth: false,
+		function: pingCommand,
+	},
+	"quit": {
+		needAuth: false,
+		function: quitCommand,
+	},
 }

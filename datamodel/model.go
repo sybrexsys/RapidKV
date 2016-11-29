@@ -61,6 +61,9 @@ type DataDictionary interface {
 }
 
 func DataObjectToString(obj CustomDataType) string {
+	if obj == nil {
+		return ""
+	}
 	l := obj.getLength()
 	m := make([]byte, l)
 	obj.writeToBytes(m)
@@ -475,8 +478,8 @@ func (obj *dataArray) Remove(Index int) {
 }
 
 func (obj *dataArray) Get(Index int) CustomDataType {
-	if Index < 0 || Index >= len(obj.list) {
-		return &storageNull
+	if Index < 0 || Index >= obj.cnt {
+		return CreateNull()
 	}
 	return obj.list[Index]
 }
