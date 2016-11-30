@@ -78,20 +78,21 @@ func hexistsCommand(db *Database, key string, command datamodel.DataArray) datam
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateInt(0)
-	}
-	dict, okstr := val.(datamodel.DataDictionary)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
-	cur := dict.Value(hkey)
-	_, ok := cur.(datamodel.DataNull)
-	if ok {
-		return datamodel.CreateInt(0)
-	}
-	return datamodel.CreateInt(1)
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, isval bool) datamodel.CustomDataType {
+		if !isval {
+			return datamodel.CreateInt(0)
+		}
+		dict, okstr := val.(datamodel.DataDictionary)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		cur := dict.Value(hkey)
+		_, ok := cur.(datamodel.DataNull)
+		if ok {
+			return datamodel.CreateInt(0)
+		}
+		return datamodel.CreateInt(1)
+	})
 }
 
 func hgetCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
@@ -99,28 +100,30 @@ func hgetCommand(db *Database, key string, command datamodel.DataArray) datamode
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateNull()
-	}
-	dict, okstr := val.(datamodel.DataDictionary)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
-	cur := dict.Value(hkey)
-	return cur.Copy()
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, isval bool) datamodel.CustomDataType {
+		if !isval {
+			return datamodel.CreateNull()
+		}
+		dict, okstr := val.(datamodel.DataDictionary)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		cur := dict.Value(hkey)
+		return cur.Copy()
+	})
 }
 
 func hlenCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateInt(0)
-	}
-	dict, okstr := val.(datamodel.DataDictionary)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
-	return datamodel.CreateInt(dict.Count())
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, isval bool) datamodel.CustomDataType {
+		if !isval {
+			return datamodel.CreateInt(0)
+		}
+		dict, okstr := val.(datamodel.DataDictionary)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		return datamodel.CreateInt(dict.Count())
+	})
 }
 
 func hstrlenCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
@@ -128,21 +131,22 @@ func hstrlenCommand(db *Database, key string, command datamodel.DataArray) datam
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateInt(0)
-	}
-	dict, okstr := val.(datamodel.DataDictionary)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
-	cur := dict.Value(hkey)
-	str, ok := cur.(datamodel.DataString)
-	if !ok {
-		return datamodel.CreateInt(0)
-	}
-	strstr := str.Get()
-	return datamodel.CreateInt(len(strstr))
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, isval bool) datamodel.CustomDataType {
+		if !isval {
+			return datamodel.CreateInt(0)
+		}
+		dict, okstr := val.(datamodel.DataDictionary)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		cur := dict.Value(hkey)
+		str, ok := cur.(datamodel.DataString)
+		if !ok {
+			return datamodel.CreateInt(0)
+		}
+		strstr := str.Get()
+		return datamodel.CreateInt(len(strstr))
+	})
 }
 
 func hsetnxCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
@@ -177,60 +181,63 @@ func hsetnxCommand(db *Database, key string, command datamodel.DataArray) datamo
 }
 
 func hgetallCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateArray(0)
-	}
-	dict, okstr := val.(datamodel.DataDictionary)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
-	arr := dict.Keys()
-	outarr := datamodel.CreateArray(arr.Count() * 2)
-	for i := 0; i < arr.Count(); i++ {
-		hkey := arr.Get(i).(datamodel.DataString).Get()
-		cur := dict.Value(hkey)
-		str, ok := cur.(datamodel.DataString)
-		if ok {
-			outarr.Add(datamodel.CreateString(hkey))
-			outarr.Add(str.Copy())
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, isval bool) datamodel.CustomDataType {
+		if !isval {
+			return datamodel.CreateArray(0)
 		}
-	}
-	return outarr
+		dict, okstr := val.(datamodel.DataDictionary)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		arr := dict.Keys()
+		outarr := datamodel.CreateArray(arr.Count() * 2)
+		for i := 0; i < arr.Count(); i++ {
+			hkey := arr.Get(i).(datamodel.DataString).Get()
+			cur := dict.Value(hkey)
+			str, ok := cur.(datamodel.DataString)
+			if ok {
+				outarr.Add(datamodel.CreateString(hkey))
+				outarr.Add(str.Copy())
+			}
+		}
+		return outarr
+	})
 }
 
 func hkeysCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateArray(0)
-	}
-	dict, okstr := val.(datamodel.DataDictionary)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
-	return dict.Keys()
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, isval bool) datamodel.CustomDataType {
+		if !isval {
+			return datamodel.CreateArray(0)
+		}
+		dict, okstr := val.(datamodel.DataDictionary)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		return dict.Keys()
+	})
 }
 
 func hvalsCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateArray(0)
-	}
-	dict, okstr := val.(datamodel.DataDictionary)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
-	arr := dict.Keys()
-	outarr := datamodel.CreateArray(arr.Count())
-	for i := 0; i < arr.Count(); i++ {
-		hkey := arr.Get(i).(datamodel.DataString).Get()
-		cur := dict.Value(hkey)
-		str, ok := cur.(datamodel.DataString)
-		if ok {
-			outarr.Add(str.Copy())
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, isval bool) datamodel.CustomDataType {
+		if !isval {
+			return datamodel.CreateArray(0)
 		}
-	}
-	return outarr
+		dict, okstr := val.(datamodel.DataDictionary)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		arr := dict.Keys()
+		outarr := datamodel.CreateArray(arr.Count())
+		for i := 0; i < arr.Count(); i++ {
+			hkey := arr.Get(i).(datamodel.DataString).Get()
+			cur := dict.Value(hkey)
+			str, ok := cur.(datamodel.DataString)
+			if ok {
+				outarr.Add(str.Copy())
+			}
+		}
+		return outarr
+	})
 }
 
 func hincrbyCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
@@ -274,29 +281,30 @@ func hincrbyCommand(db *Database, key string, command datamodel.DataArray) datam
 }
 
 func hmgetCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateArray(0)
-	}
-	dict, okstr := val.(datamodel.DataDictionary)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
-	outarr := datamodel.CreateArray(command.Count())
-	for i := 0; i < command.Count(); i++ {
-		hkey, err := getKey(command, i)
-		if err != nil {
-			return datamodel.CreateError("ERR Unknown parameter")
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, isval bool) datamodel.CustomDataType {
+		if !isval {
+			return datamodel.CreateArray(0)
 		}
-		cur := dict.Value(hkey)
-		switch cur.(type) {
-		case datamodel.DataString:
-			outarr.Add(cur.Copy())
-		case datamodel.DataNull:
-			outarr.Add(cur.Copy())
+		dict, okstr := val.(datamodel.DataDictionary)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
 		}
-	}
-	return outarr
+		outarr := datamodel.CreateArray(command.Count())
+		for i := 0; i < command.Count(); i++ {
+			hkey, err := getKey(command, i)
+			if err != nil {
+				return datamodel.CreateError("ERR Unknown parameter")
+			}
+			cur := dict.Value(hkey)
+			switch cur.(type) {
+			case datamodel.DataString:
+				outarr.Add(cur.Copy())
+			case datamodel.DataNull:
+				outarr.Add(cur.Copy())
+			}
+		}
+		return outarr
+	})
 }
 
 func hmsetCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {

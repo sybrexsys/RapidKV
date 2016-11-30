@@ -151,15 +151,16 @@ func rpushxCommand(db *Database, key string, command datamodel.DataArray) datamo
 }
 
 func llenCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateInt(0)
-	}
-	arr, okstr := val.(datamodel.DataArray)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
-	return datamodel.CreateInt(arr.Count())
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, present bool) datamodel.CustomDataType {
+		if !present {
+			return datamodel.CreateInt(0)
+		}
+		arr, okstr := val.(datamodel.DataArray)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		return datamodel.CreateInt(arr.Count())
+	})
 }
 
 func lindexCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
@@ -167,20 +168,20 @@ func lindexCommand(db *Database, key string, command datamodel.DataArray) datamo
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, present bool) datamodel.CustomDataType {
+		if !present {
+			return datamodel.CreateNull()
+		}
+		arr, okstr := val.(datamodel.DataArray)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
 
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateNull()
-	}
-	arr, okstr := val.(datamodel.DataArray)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
-
-	if idx < 0 {
-		idx = arr.Count() + idx
-	}
-	return arr.Get(idx).Copy()
+		if idx < 0 {
+			idx = arr.Count() + idx
+		}
+		return arr.Get(idx).Copy()
+	})
 }
 
 func linsertCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
@@ -333,44 +334,44 @@ func lrangeCommand(db *Database, key string, command datamodel.DataArray) datamo
 	if err != nil {
 		return datamodel.CreateError("ERR Unknown parameter")
 	}
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, present bool) datamodel.CustomDataType {
+		if !present {
+			return datamodel.CreateArray(0)
+		}
 
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateArray(0)
-	}
+		arr, okstr := val.(datamodel.DataArray)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
 
-	arr, okstr := val.(datamodel.DataArray)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
+		cnt := arr.Count()
 
-	cnt := arr.Count()
+		if fromval < 0 {
+			fromval = cnt + fromval
+		}
+		if toval < 0 {
+			toval = cnt + toval
+		}
 
-	if fromval < 0 {
-		fromval = cnt + fromval
-	}
-	if toval < 0 {
-		toval = cnt + toval
-	}
+		if fromval < 0 {
+			fromval = 0
+		}
+		if toval < 0 {
+			toval = 0
+		}
 
-	if fromval < 0 {
-		fromval = 0
-	}
-	if toval < 0 {
-		toval = 0
-	}
+		if toval >= cnt {
+			toval = cnt - 1
+		}
 
-	if toval >= cnt {
-		toval = cnt - 1
-	}
+		if fromval > toval {
+			return datamodel.CreateArray(0)
+		}
 
-	if fromval > toval {
-		return datamodel.CreateArray(0)
-	}
-
-	res := datamodel.CreateArray(toval - fromval + 1)
-	for i := fromval; i <= toval; i++ {
-		res.Add(arr.Get(i).Copy())
-	}
-	return res
+		res := datamodel.CreateArray(toval - fromval + 1)
+		for i := fromval; i <= toval; i++ {
+			res.Add(arr.Get(i).Copy())
+		}
+		return res
+	})
 }

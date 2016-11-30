@@ -22,7 +22,7 @@ func TestGetSet(t *testing.T) {
 	if keys != `["100"]` {
 		t.Fatal("invalid key was found")
 	}
-	get, a := database.GetValue("100")
+	get, a := database.GetValueCopy("100")
 	if !a {
 		t.Fatal("value was not found")
 	}

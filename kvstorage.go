@@ -208,15 +208,35 @@ func (db *Database) Move(Key string, newDB *Database) bool {
 	return true
 }
 
-func (db *Database) GetValue(Key string) (datamodel.CustomDataType, bool) {
+func (db *Database) GetValueExists(Key string) bool {
+	shard := db.keyToShard(Key)
+	shard.RLock()
+	defer shard.RUnlock()
+	_, ok := shard.mapkv[Key]
+	return ok
+}
+
+func (db *Database) GetValueCopy(Key string) (datamodel.CustomDataType, bool) {
+	shard := db.keyToShard(Key)
+	shard.RLock()
+	defer shard.RUnlock()
+	val, ok := shard.mapkv[Key]
+	if ok {
+		return val.Value.Copy(), ok
+	}
+	return nil, ok
+}
+
+func (db *Database) GetValueAndProcess(Key string,
+	f func(value datamodel.CustomDataType, present bool) datamodel.CustomDataType) datamodel.CustomDataType {
 	shard := db.keyToShard(Key)
 	shard.RLock()
 	defer shard.RUnlock()
 	el, ok := shard.mapkv[Key]
-	if !ok {
-		return nil, ok
+	if ok {
+		return f(el.Value, ok)
 	}
-	return el.Value, ok
+	return f(nil, ok)
 }
 
 func AddKeysFromShard(shard *shardElem, array datamodel.DataArray, pattern string) error {

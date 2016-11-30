@@ -9,20 +9,21 @@ func keysCommand(db *Database, key string, command datamodel.DataArray) datamode
 }
 
 func typeCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateSimpleString("none")
-	}
-	switch val.(type) {
-	case datamodel.DataString:
-		return datamodel.CreateSimpleString("string")
-	case datamodel.DataArray:
-		return datamodel.CreateSimpleString("list")
-	case datamodel.DataDictionary:
-		return datamodel.CreateSimpleString("hash")
-	default:
-		return datamodel.CreateSimpleString("none")
-	}
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, present bool) datamodel.CustomDataType {
+		if !present {
+			return datamodel.CreateSimpleString("none")
+		}
+		switch val.(type) {
+		case datamodel.DataString:
+			return datamodel.CreateSimpleString("string")
+		case datamodel.DataArray:
+			return datamodel.CreateSimpleString("list")
+		case datamodel.DataDictionary:
+			return datamodel.CreateSimpleString("hash")
+		default:
+			return datamodel.CreateSimpleString("none")
+		}
+	})
 }
 
 func delCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
@@ -45,7 +46,7 @@ func delCommand(db *Database, key string, command datamodel.DataArray) datamodel
 
 func existsCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
 	exists := 0
-	if _, ok := db.GetValue(key); ok {
+	if db.GetValueExists(key) {
 		exists++
 	}
 	cnt := command.Count()
@@ -54,7 +55,7 @@ func existsCommand(db *Database, key string, command datamodel.DataArray) datamo
 		if err != nil {
 			return datamodel.CreateError("ERR Unknown parameter")
 		}
-		if _, ok := db.GetValue(key); ok {
+		if db.GetValueExists(key) {
 			exists++
 		}
 	}

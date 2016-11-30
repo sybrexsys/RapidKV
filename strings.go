@@ -9,15 +9,16 @@ import (
 )
 
 func getCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateNull()
-	}
-	_, okstr := val.(datamodel.DataString)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
-	return val.Copy()
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, isval bool) datamodel.CustomDataType {
+		if !isval {
+			return datamodel.CreateNull()
+		}
+		_, okstr := val.(datamodel.DataString)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		return val.Copy()
+	})
 }
 
 func mgetCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
@@ -32,7 +33,7 @@ func mgetCommand(db *Database, key string, command datamodel.DataArray) datamode
 				continue
 			}
 		}
-		val, isval := db.GetValue(key)
+		val, isval := db.GetValueCopy(key)
 		if !isval {
 			arr.Add(datamodel.CreateNull())
 			continue
@@ -42,7 +43,7 @@ func mgetCommand(db *Database, key string, command datamodel.DataArray) datamode
 			arr.Add(datamodel.CreateNull())
 			continue
 		}
-		arr.Add(val.Copy())
+		arr.Add(val)
 	}
 	return arr
 }
@@ -307,13 +308,14 @@ func decrbyCommand(db *Database, key string, command datamodel.DataArray) datamo
 }
 
 func strlenCommand(db *Database, key string, command datamodel.DataArray) datamodel.CustomDataType {
-	val, isval := db.GetValue(key)
-	if !isval {
-		return datamodel.CreateInt(0)
-	}
-	str, okstr := val.(datamodel.DataString)
-	if !okstr {
-		return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
-	}
-	return datamodel.CreateInt(len(str.Get()))
+	return db.GetValueAndProcess(key, func(val datamodel.CustomDataType, isval bool) datamodel.CustomDataType {
+		if !isval {
+			return datamodel.CreateInt(0)
+		}
+		str, okstr := val.(datamodel.DataString)
+		if !okstr {
+			return datamodel.CreateError("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		return datamodel.CreateInt(len(str.Get()))
+	})
 }

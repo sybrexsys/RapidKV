@@ -874,7 +874,7 @@ func TestCommands(t *testing.T) {
 	}
 	for i := 0; i < len(commands); i += 2 {
 		res := cc.processOneRESPCommand(Get(i, t))
-		//	fmt.Println(commands[i])
+		//		fmt.Println(commands[i])
 		s := datamodel.DataObjectToString(res)
 		if s != commands[i+1] {
 			t.Fatalf("invalid answer. Step: %d \rSource:%s\rWait  : %s\rResult: %s\r", i/2, commands[i], commands[i+1], s)
