@@ -179,11 +179,12 @@ func processRESPConnection(c net.Conn) {
 			buf := make([]byte, 4096)
 			n := runtime.Stack(buf, false)
 			buf = buf[0:n]
-			fmt.Printf("client run panic %s:%v\rLast command to server was:%s", buf, e, datamodel.DataObjectToString(request))
+			fmt.Printf("client run panic %s:%v\rLast command to server was:%s\r", buf, e, datamodel.DataObjectToString(request))
 		}
 		c.Close()
 		notifier.Done()
 	}()
+	fmt.Printf("New client connection detected. Remote address: %s\r", c.RemoteAddr().String())
 	notifier.Add(1)
 	reader := bufio.NewReader(c)
 	writer := bufio.NewWriter(c)
@@ -210,7 +211,7 @@ func processRESPConnection(c net.Conn) {
 			if ok && netErr.Timeout() && netErr.Temporary() {
 				if cc.answersSize != 0 {
 					if err := cc.popAnswers(writer); err != nil {
-						fmt.Printf("Client connection lost/ Error:%s", err.Error())
+						fmt.Printf("Client connection lost. Error:%s\r", err.Error())
 						return
 					}
 				}
@@ -229,7 +230,7 @@ func processRESPConnection(c net.Conn) {
 		if err != nil {
 			parseError, ok := err.(datamodel.ParseError)
 			if !ok {
-				fmt.Printf("Client connection lost/ Error:%s", err.Error())
+				fmt.Printf("Client connection lost/ Error:%s\r", err.Error())
 				return
 			}
 			answer := datamodel.CreateError(parseError.Error())
