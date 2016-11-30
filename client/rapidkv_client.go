@@ -22,9 +22,9 @@ type RapidVKClientOptions struct {
 
 var DefaultOptions = RapidVKClientOptions{
 	Address:        "127.0.0.1",
-	Port:           45332,
+	Port:           18018,
 	MaxConnections: 32,
-	Password:       "",
+	Password:       "test",
 }
 
 func (err RapidVKError) Error() string { return "RapidVKError Error: " + string(err) }
@@ -38,17 +38,13 @@ type Client struct {
 	pool chan net.Conn
 }
 
-func CreateClient(DBIdx int, Options *RapidVKClientOptions) (*Client, error) {
+func CreateClient(Options *RapidVKClientOptions) (*Client, error) {
 	if Options == nil {
 		Options = &DefaultOptions
 	}
 	tmp := &Client{
 		options: Options,
-		db:      DBIdx,
 		pool:    make(chan net.Conn, Options.MaxConnections),
-	}
-	for i := uint16(0); i < Options.MaxConnections; i++ {
-		tmp.pool <- nil
 	}
 	return tmp, nil
 }
@@ -56,9 +52,7 @@ func CreateClient(DBIdx int, Options *RapidVKClientOptions) (*Client, error) {
 func (client *Client) Close() error {
 	close(client.pool)
 	for conn := range client.pool {
-		if conn != nil {
-			conn.Close()
-		}
+		conn.Close()
 	}
 	return nil
 }
@@ -71,18 +65,8 @@ func (client *Client) openConnection() (net.Conn, error) {
 	if err != nil {
 		return c, err
 	}
-
-	//handle authentication here authored by @shxsun
 	if client.options.Password != "" {
 		cmd := fmt.Sprintf("AUTH %s\r\n", client.options.Password)
-		_, err = client.rawSend(c, []byte(cmd))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if client.db != 0 {
-		cmd := fmt.Sprintf("SELECT %d\r\n", client.db)
 		_, err = client.rawSend(c, []byte(cmd))
 		if err != nil {
 			return nil, err
@@ -92,7 +76,6 @@ func (client *Client) openConnection() (net.Conn, error) {
 }
 
 func (client *Client) popCon() (net.Conn, error) {
-	// grab a connection from the pool
 	for {
 		select {
 		case con := <-client.pool:
@@ -159,7 +142,6 @@ func (client *Client) rawSend(c net.Conn, cmd []byte) (interface{}, error) {
 }
 
 func (client *Client) sendCommand(cmd string, args ...string) (data interface{}, err error) {
-	// grab a connection from the pool
 	var b []byte
 	c, err := client.popCon()
 	if err != nil {
