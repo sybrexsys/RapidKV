@@ -55,7 +55,7 @@ func main() {
 	databases[0] = firstDatabase
 	needAuth = cfg.AuthPass != ""
 
-	listener, err := net.Listen("tcp", "localhost:"+strconv.Itoa(cfg.Port))
+	listener, err := net.Listen("tcp", ":"+strconv.Itoa(cfg.Port))
 	if err != nil {
 		log.Fatal("Listener was not created")
 		return
