@@ -209,7 +209,8 @@ func processRESPConnection(c net.Conn) {
 			netErr, ok := err.(net.Error)
 			if ok && netErr.Timeout() && netErr.Temporary() {
 				if cc.answersSize != 0 {
-					if cc.popAnswers(writer) != nil {
+					if err := cc.popAnswers(writer); err != nil {
+						fmt.Printf("Client connection lost/ Error:%s", err.Error())
 						return
 					}
 				}
@@ -228,6 +229,7 @@ func processRESPConnection(c net.Conn) {
 		if err != nil {
 			parseError, ok := err.(datamodel.ParseError)
 			if !ok {
+				fmt.Printf("Client connection lost/ Error:%s", err.Error())
 				return
 			}
 			answer := datamodel.CreateError(parseError.Error())
