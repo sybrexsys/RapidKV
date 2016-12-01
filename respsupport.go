@@ -26,6 +26,7 @@ type clientConnection struct {
 	inMulti         bool
 	queue           datamodel.DataArray
 	writer          *bufio.Writer
+	reader          *bufio.Reader
 }
 
 func (cc *clientConnection) setCapacity(newCapacity int) {
@@ -51,7 +52,9 @@ func (cc *clientConnection) grow() {
 
 func (cc *clientConnection) pushAnswer(answer datamodel.CustomDataType) error {
 	_, err := cc.writer.Write(datamodel.ConvertToRASP(answer))
-	cc.writer.Flush()
+	if cc.reader.Buffered() == 0 {
+		cc.writer.Flush()
+	}
 	return err
 }
 
@@ -170,7 +173,6 @@ func processRESPConnection(c net.Conn) {
 	}()
 	fmt.Printf("New client connection detected. Remote address: %s\r\n", c.RemoteAddr().String())
 	notifier.Add(1)
-	reader := bufio.NewReader(c)
 
 	cc := &clientConnection{
 		answers:         make([]datamodel.CustomDataType, 100),
@@ -178,17 +180,18 @@ func processRESPConnection(c net.Conn) {
 		currentDatabase: firstDatabase,
 		authorized:      !needAuth,
 		writer:          bufio.NewWriter(c),
+		reader:          bufio.NewReader(c),
 	}
 	go func() {
 		<-quit
 		c.SetReadDeadline(time.Now().Add(0))
 	}()
 	for {
-		request, err := datamodel.LoadRespFromIO(reader, true)
+		request, err := datamodel.LoadRespFromIO(cc.reader, true)
 		if err != nil {
 			parseError, ok := err.(datamodel.ParseError)
 			if !ok {
-				fmt.Printf("Client connection lost. Error:%s\r\n", err.Error())
+				fmt.Printf("Client connection lost.\r\n")
 				return
 			}
 			answer := datamodel.CreateError(parseError.Error())

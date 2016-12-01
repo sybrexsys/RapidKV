@@ -6,7 +6,7 @@ import (
 
 	"strconv"
 
-	//	"fmt"
+	"fmt"
 
 	"github.com/sybrexsys/RapidKV/datamodel"
 )
@@ -828,9 +828,11 @@ var commands = []string{
 	`"OK"`,
 }
 
+var address = "127.0.0.1"
+
 func TestClient(t *testing.T) {
 	options := DefaultOptions
-	options.Address = "188.226.131.142"
+	options.Address = address
 	options.Password = "test"
 	options.Port = 18018
 	client, err := CreateClient(&options)
@@ -867,8 +869,9 @@ func TestClient(t *testing.T) {
 var acc = 0
 
 func BenchmarkClient(b *testing.B) {
+	fmt.Println("Started with ", b.N)
 	options := DefaultOptions
-	options.Address = "127.0.0.1"
+	options.Address = address
 	options.Password = "test"
 	options.Port = 18018
 	t := time.Now()
@@ -877,11 +880,16 @@ func BenchmarkClient(b *testing.B) {
 		b.Fatalf("Error of the creating client: %s", err.Error())
 	}
 	client.SendCommand("select", strconv.Itoa(acc+1))
+	client.Pipelining(true)
 	for i := 0; i < b.N; i++ {
-		answ, err := client.SendCommand("set", strconv.Itoa(i), "test", "px", "15000")
-		if err != nil {
-			b.Fatalf("Error of the reading client: %s", err.Error())
-		}
+		client.SendCommand("set", strconv.Itoa(i), "test", "px", "15000")
+	}
+	answers, err := client.Flush()
+	if err != nil {
+		b.Fatalf("Error of the receive information from client: %s", err.Error())
+	}
+
+	for _, answ := range answers {
 		switch value := answ.(type) {
 		case datamodel.DataString:
 			if value.IsError() {
@@ -891,12 +899,12 @@ func BenchmarkClient(b *testing.B) {
 	}
 	client.Close()
 	acc++
-	b.Log("Total time ", b.N, "  ", time.Since(t))
+	fmt.Println("Total time ", b.N, "  ", time.Since(t))
 }
 
 func TestClient1000(b *testing.T) {
 	options := DefaultOptions
-	options.Address = "localhost"
+	options.Address = address
 	options.Password = "test"
 	options.Port = 18018
 	t := time.Now()
@@ -905,20 +913,25 @@ func TestClient1000(b *testing.T) {
 		b.Fatalf("Error of the creating client: %s", err.Error())
 	}
 	client.SendCommand("select", strconv.Itoa(acc+1))
-	for i := 0; i < 1000; i++ {
-		answ, err := client.SendCommand("set", strconv.Itoa(i), "test", "px", "15000")
-		if err != nil {
-			b.Fatalf("Error of the reading client: %s", err.Error())
-		}
+	client.Pipelining(true)
+	for i := 0; i < 200000; i++ {
+		client.SendCommand("set", strconv.Itoa(i), "test", "px", "15000")
+	}
+	fmt.Println("Preparing time  ", time.Since(t), "input request size ", client.commands.Len())
+	answers, err := client.Flush()
+	if err != nil {
+		b.Fatalf("Error of the receive information from client: %s", err.Error())
+	}
+
+	for i, answ := range answers {
 		switch value := answ.(type) {
 		case datamodel.DataString:
 			if value.IsError() {
-				b.Fatalf("Error of the reading client: %s", value.Get())
+				b.Fatalf("Error of the reading client step %i: %s", i, value.Get())
 			}
 		}
-		//		fmt.Println(datamodel.DataObjectToString(answ))
 	}
 	client.Close()
 	acc++
-	b.Log("Total time  ", time.Since(t))
+	fmt.Println("Total time  ", time.Since(t), "Total aswers: ", len(answers))
 }

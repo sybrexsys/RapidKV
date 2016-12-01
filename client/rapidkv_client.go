@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/sybrexsys/RapidKV/datamodel"
+	"sync"
 )
 
 type RapidKVError string
@@ -61,24 +62,71 @@ func (client *Client) Close() error {
 }
 
 func (client *Client) Flush() ([]datamodel.CustomDataType, error) {
+	defer func() {
+		client.count = 0
+		client.commands.Reset()
+	}()
 	if !client.pipelining {
 		return nil, RapidKVError("not in pipelining state")
 	}
+	var (
+		mtx       sync.Mutex
+		globalerr error
+	)
 	arr := make([]datamodel.CustomDataType, client.count)
-	_, err := client.commands.WriteTo(client.connection)
-	if err != nil {
-		return nil, err
-	}
-	bufreader := bufio.NewReader(client.connection)
-	for i := 0; i < client.count; i++ {
-		answer, err := datamodel.LoadRespFromIO(bufreader, true)
+	var wt sync.WaitGroup
+	wt.Add(1)
+	go func() {
+		defer wt.Done()
+		bufreader := bufio.NewReader(client.connection)
+		for i := 0; i < client.count; i++ {
+			answer, err := datamodel.LoadRespFromIO(bufreader, true)
+			if err != nil {
+				mtx.Lock()
+				globalerr = err
+				mtx.Unlock()
+				return
+			}
+			arr[i] = answer
+		}
+
+	}()
+	size := client.commands.Len()
+	if size > 1024*1024 {
+		var err error
+		start := 0
+		buf := client.commands.Bytes()
+		for {
+			if size > 1024*1024 {
+				_, err = client.connection.Write(buf[start : start+1024*1024])
+			} else {
+				_, err = client.connection.Write(buf[start : start+size])
+			}
+			if err != nil {
+				return nil, err
+			}
+			mtx.Lock()
+			err = globalerr
+			mtx.Unlock()
+			if err != nil {
+				return nil, globalerr
+			}
+			start += 1024 * 1024
+			size -= 1024 * 1024
+			if size <= 0 {
+				break
+			}
+		}
+	} else {
+		_, err := client.commands.WriteTo(client.connection)
 		if err != nil {
 			return nil, err
 		}
-		arr[i] = answer
 	}
-	client.count = 0
-	client.commands.Reset()
+	wt.Wait()
+	if globalerr != nil {
+		return nil, globalerr
+	}
 	return arr, nil
 }
 
