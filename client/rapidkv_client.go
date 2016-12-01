@@ -4,38 +4,39 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"net"
-	"runtime"
-	"strings"
-	"sync"
+	"strconv"
+
+	"github.com/sybrexsys/RapidKV/datamodel"
 )
+
+type RapidKVError string
+
+func (err RapidKVError) Error() string { return string(err) }
 
 type RapidVKError string
 
 type RapidVKClientOptions struct {
-	Address        string
-	Password       string
-	Port           uint16
-	MaxConnections uint16
+	Address  string
+	Password string
+	Port     uint16
 }
 
 var DefaultOptions = RapidVKClientOptions{
-	Address:        "127.0.0.1",
-	Port:           18018,
-	MaxConnections: 32,
-	Password:       "test",
+	Address:  "127.0.0.1",
+	Port:     18018,
+	Password: "test",
 }
 
 func (err RapidVKError) Error() string { return "RapidVKError Error: " + string(err) }
 
 type Client struct {
-	options  *RapidVKClientOptions
-	db       int
-	password string
-	//the connection pool
-	sync.Mutex
-	pool chan net.Conn
+	options    *RapidVKClientOptions
+	password   string
+	connection net.Conn
+	commands   bytes.Buffer
+	count      int
+	pipelining bool
 }
 
 func CreateClient(Options *RapidVKClientOptions) (*Client, error) {
@@ -44,128 +45,98 @@ func CreateClient(Options *RapidVKClientOptions) (*Client, error) {
 	}
 	tmp := &Client{
 		options: Options,
-		pool:    make(chan net.Conn, Options.MaxConnections),
+		count:   0,
 	}
+	tconn, err := tmp.openConnection()
+	if err != nil {
+		return nil, err
+	}
+	tmp.connection = tconn
 	return tmp, nil
 }
 
 func (client *Client) Close() error {
-	close(client.pool)
-	for conn := range client.pool {
-		conn.Close()
-	}
+	client.connection.Close()
 	return nil
 }
 
+func (client *Client) Flush() ([]datamodel.CustomDataType, error) {
+	if !client.pipelining {
+		return nil, RapidKVError("not in pipelining state")
+	}
+	arr := make([]datamodel.CustomDataType, client.count)
+	_, err := client.commands.WriteTo(client.connection)
+	if err != nil {
+		return nil, err
+	}
+	bufreader := bufio.NewReader(client.connection)
+	for i := 0; i < client.count; i++ {
+		answer, err := datamodel.LoadRespFromIO(bufreader, true)
+		if err != nil {
+			return nil, err
+		}
+		arr[i] = answer
+	}
+	client.count = 0
+	client.commands.Reset()
+	return arr, nil
+}
+
+func (client *Client) Pipelining(state bool) ([]datamodel.CustomDataType, error) {
+	if state == client.pipelining {
+		return nil, nil
+	}
+	if client.pipelining {
+		return client.Flush()
+	}
+	client.pipelining = true
+	return nil, nil
+}
+
 func (client *Client) openConnection() (net.Conn, error) {
-
 	var addr = fmt.Sprintf("%s:%d", client.options.Address, client.options.Port)
-
 	c, err := net.Dial("tcp", addr)
 	if err != nil {
 		return c, err
 	}
 	if client.options.Password != "" {
-		cmd := fmt.Sprintf("AUTH %s\r\n", client.options.Password)
-		_, err = client.rawSend(c, []byte(cmd))
+		res, err := client.sendCommand(c, "AUTH", client.options.Password)
 		if err != nil {
+			c.Close()
 			return nil, err
+		}
+		answer, ok := res.(datamodel.DataString)
+		if ok && answer.IsError() {
+			c.Close()
+			return nil, RapidKVError(answer.Get())
 		}
 	}
 	return c, nil
 }
 
-func (client *Client) popCon() (net.Conn, error) {
-	for {
-		select {
-		case con := <-client.pool:
-			return con, nil
-		default:
-			client.Lock()
-			if len(client.pool) < int(client.options.MaxConnections) {
-				return client.openConnection()
-			}
-			client.Unlock()
-			runtime.Gosched()
-		}
+func (client *Client) sendCommand(connection net.Conn, cmd string, args ...string) (datamodel.CustomDataType, error) {
+	if client.pipelining {
+		client.commands.Write(client.prepareCommand(cmd, args...))
+		client.count++
+		return nil, nil
 	}
-}
-
-func (client *Client) pushCon(c net.Conn) {
-	client.pool <- c
-}
-
-func readResponse(reader *bufio.Reader) (interface{}, error) {
-
-	var line string
-	var err error
-
-	//read until the first non-whitespace line
-	for {
-		line, err = reader.ReadString('\n')
-		if len(line) == 0 || err != nil {
-			return nil, err
-		}
-		line = strings.TrimSpace(line)
-		if len(line) > 0 {
-			break
-		}
-	}
-
-	if line[0] == '+' {
-		return strings.TrimSpace(line[1:]), nil
-	}
-
-	if strings.HasPrefix(line, "-ERR ") {
-		errmesg := strings.TrimSpace(line[5:])
-		return nil, RapidVKError(errmesg)
-	}
-
-	return "", nil
-
-}
-
-func (client *Client) rawSend(c net.Conn, cmd []byte) (interface{}, error) {
-	_, err := c.Write(cmd)
+	buf := client.prepareCommand(cmd, args...)
+	_, err := connection.Write(buf)
 	if err != nil {
 		return nil, err
 	}
-
-	reader := bufio.NewReader(c)
-
-	data, err := readResponse(reader)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
+	bufreader := bufio.NewReader(connection)
+	return datamodel.LoadRespFromIO(bufreader, true)
 }
 
-func (client *Client) sendCommand(cmd string, args ...string) (data interface{}, err error) {
-	var b []byte
-	c, err := client.popCon()
-	if err != nil {
-		return nil, err
-	}
-	defer client.pushCon(c)
-
-	b = commandBytes(cmd, args...)
-	data, err = client.rawSend(c, b)
-	if err == io.EOF {
-		c, err = client.openConnection()
-		if err != nil {
-			return nil, err
-		}
-		data, err = client.rawSend(c, b)
-	}
-	return data, err
+func (client *Client) SendCommand(cmd string, args ...string) (datamodel.CustomDataType, error) {
+	return client.sendCommand(client.connection, cmd, args...)
 }
 
-func commandBytes(cmd string, args ...string) []byte {
-	var cmdbuf bytes.Buffer
-	fmt.Fprintf(&cmdbuf, "*%d\r\n$%d\r\n%s\r\n", len(args)+1, len(cmd), cmd)
+func (client *Client) prepareCommand(cmd string, args ...string) []byte {
+	header := "*" + strconv.Itoa(len(args)+1) + "\r\n$" + strconv.Itoa(len(cmd)) + "\r\n" + cmd + "\r\n"
 	for _, s := range args {
-		fmt.Fprintf(&cmdbuf, "$%d\r\n%s\r\n", len(s), s)
+		header = header + "$" + strconv.Itoa(len(s)) + "\r\n" + s + "\r\n"
 	}
-	return cmdbuf.Bytes()
+	return []byte(header)
 }

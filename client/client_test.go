@@ -1,9 +1,17 @@
 package client
 
-var commands = []string{
+import (
+	"testing"
+	"time"
 
-	"*2\r\n$3\r\nget\r\n$-1\r\n",
-	`"ERR Unknown parameter"`,
+	"strconv"
+
+	"fmt"
+
+	"github.com/sybrexsys/RapidKV/datamodel"
+)
+
+var commands = []string{
 
 	"set 100 100",
 	`"OK"`,
@@ -29,20 +37,11 @@ var commands = []string{
 	"type 150",
 	`"none"`,
 
-	"*2\r\n$4\r\ntype\r\n$-1\r\n",
-	`"ERR Unknown parameter"`,
-
-	"*2\r\n$3\r\ndel\r\n$-1\r\n",
-	`"ERR Unknown parameter"`,
-
 	"del 150",
 	"0",
 
 	"del 100",
 	"1",
-
-	"*2\r\n$6\r\nexists\r\n$-1\r\n",
-	`"ERR Unknown parameter"`,
 
 	"exists 150",
 	"0",
@@ -243,11 +242,6 @@ var commands = []string{
 	"discard",
 	`"OK"`,
 
-	"*0\r\n",
-	`"ERR Invalid command"`,
-	"*1\r\n:1\r\n",
-	`"ERR Invalid command"`,
-
 	"append 30",
 	`"ERR Unknown parameter"`,
 
@@ -310,9 +304,6 @@ var commands = []string{
 
 	`get a100`,
 	`null`,
-
-	"*4\r\n$3\r\nset\r\n$3\r\nset\r\n$3\r\nset\r\n*0\r\n",
-	`"ERR Unknown parameter"`,
 
 	`strlen a100`,
 	`0`,
@@ -837,6 +828,97 @@ var commands = []string{
 	`"OK"`,
 }
 
-func main() {
+func TestClient(t *testing.T) {
+	options := DefaultOptions
+	options.Address = "188.226.131.142"
+	options.Password = "test"
+	options.Port = 18018
+	client, err := CreateClient(&options)
+	if err != nil {
+		t.Fatalf("Error of the creating client: %s", err.Error())
+	}
+	answ, err := client.SendCommand("ping")
+	if err != nil {
+		t.Fatalf("Error of the reading client: %s", err.Error())
+	}
+	str := datamodel.DataObjectToString(answ)
+	if str != `"PONG"` {
+		t.Fatalf("Error of the receving information from client: %s", str)
+	}
 
+	client.Pipelining(true)
+	for i := 0; i < 1000; i++ {
+		client.SendCommand("ping")
+	}
+	res, err := client.Flush()
+	if err != nil {
+		t.Fatalf("Error of the receiving Pipelining answer: %s", err.Error())
+	}
+	for i := 0; i < 1000; i++ {
+		str := datamodel.DataObjectToString(res[i])
+		if str != `"PONG"` {
+			t.Fatalf("Error of the receving information from client: %s", str)
+		}
+	}
+
+	client.Close()
+}
+
+var acc = 0
+
+func BenchmarkClient(b *testing.B) {
+	options := DefaultOptions
+	options.Address = "188.226.131.142"
+	options.Password = "test"
+	options.Port = 18018
+	t := time.Now()
+	client, err := CreateClient(&options)
+	if err != nil {
+		b.Fatalf("Error of the creating client: %s", err.Error())
+	}
+	client.SendCommand("select", strconv.Itoa(acc+1))
+	for i := 0; i < b.N; i++ {
+		answ, err := client.SendCommand("set", strconv.Itoa(i), "test", "px", "15000")
+		if err != nil {
+			b.Fatalf("Error of the reading client: %s", err.Error())
+		}
+		switch value := answ.(type) {
+		case datamodel.DataString:
+			if value.IsError() {
+				b.Fatalf("Error of the reading client: %s", value.Get())
+			}
+		}
+	}
+	client.Close()
+	acc++
+	b.Log("Total time ", b.N, "  ", time.Since(t))
+}
+
+func TestClient1000(b *testing.T) {
+	options := DefaultOptions
+	options.Address = "localhost"
+	options.Password = "test"
+	options.Port = 18018
+	t := time.Now()
+	client, err := CreateClient(&options)
+	if err != nil {
+		b.Fatalf("Error of the creating client: %s", err.Error())
+	}
+	client.SendCommand("select", strconv.Itoa(acc+1))
+	for i := 0; i < 1000; i++ {
+		answ, err := client.SendCommand("set", strconv.Itoa(i), "test", "px", "15000")
+		if err != nil {
+			b.Fatalf("Error of the reading client: %s", err.Error())
+		}
+		switch value := answ.(type) {
+		case datamodel.DataString:
+			if value.IsError() {
+				b.Fatalf("Error of the reading client: %s", value.Get())
+			}
+		}
+		fmt.Println(datamodel.DataObjectToString(answ))
+	}
+	client.Close()
+	acc++
+	b.Log("Total time  ", time.Since(t))
 }

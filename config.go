@@ -10,7 +10,7 @@ type config struct {
 var defConfig = config{
 	Port:        18018,
 	StartAsREST: false,
-	AuthPass:    "test",
+	AuthPass:    "",
 	ShardCount:  32,
 }
 

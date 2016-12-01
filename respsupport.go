@@ -199,34 +199,34 @@ func processRESPConnection(c net.Conn) {
 		c.SetReadDeadline(time.Now().Add(0))
 	}()
 	for {
-		c.SetReadDeadline(time.Now().Add(time.Millisecond * 200))
-		ch, err := reader.ReadByte()
-		select {
-		case <-quit:
-			return
-		default:
-		}
-		if err != nil {
-			netErr, ok := err.(net.Error)
-			if ok && netErr.Timeout() && netErr.Temporary() {
-				if cc.answersSize != 0 {
-					if err := cc.popAnswers(writer); err != nil {
-						fmt.Printf("Client connection lost. Error:%s\r", err.Error())
-						return
-					}
+		/*		c.SetReadDeadline(time.Now().Add(time.Millisecond * 200))
+				ch, err := reader.ReadByte()
+				select {
+				case <-quit:
+					return
+				default:
 				}
-				continue
-			}
-		} else {
-			if ch == '\r' {
-				reader.ReadBytes(10)
-				continue
-			} else {
-				reader.UnreadByte()
-				c.SetReadDeadline(time.Now().Add(time.Second * 50))
-			}
-		}
-		request, err = datamodel.LoadRespFromIO(reader, true)
+				if err != nil {
+					netErr, ok := err.(net.Error)
+					if ok && netErr.Timeout() && netErr.Temporary() {
+						if cc.answersSize != 0 {
+							if err := cc.popAnswers(writer); err != nil {
+								fmt.Printf("Client connection lost. Error:%s\r", err.Error())
+								return
+							}
+						}
+						continue
+					}
+				} else {
+					if ch == '\r' {
+						reader.ReadBytes(10)
+						continue
+					} else {
+						reader.UnreadByte()
+						c.SetReadDeadline(time.Now().Add(time.Second * 50))
+					}
+				}*/
+		request, err := datamodel.LoadRespFromIO(reader, true)
 		if err != nil {
 			parseError, ok := err.(datamodel.ParseError)
 			if !ok {
@@ -238,6 +238,7 @@ func processRESPConnection(c net.Conn) {
 		}
 		answer := cc.processOneRESPCommand(request)
 		cc.pushAnswer(answer)
+		cc.popAnswers(writer)
 		if cc.needQuit {
 			cc.popAnswers(writer)
 			break
