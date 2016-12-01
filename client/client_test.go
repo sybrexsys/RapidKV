@@ -6,7 +6,7 @@ import (
 
 	"strconv"
 
-	"fmt"
+	//	"fmt"
 
 	"github.com/sybrexsys/RapidKV/datamodel"
 )
@@ -868,7 +868,7 @@ var acc = 0
 
 func BenchmarkClient(b *testing.B) {
 	options := DefaultOptions
-	options.Address = "188.226.131.142"
+	options.Address = "127.0.0.1"
 	options.Password = "test"
 	options.Port = 18018
 	t := time.Now()
@@ -916,7 +916,7 @@ func TestClient1000(b *testing.T) {
 				b.Fatalf("Error of the reading client: %s", value.Get())
 			}
 		}
-		fmt.Println(datamodel.DataObjectToString(answ))
+		//		fmt.Println(datamodel.DataObjectToString(answ))
 	}
 	client.Close()
 	acc++

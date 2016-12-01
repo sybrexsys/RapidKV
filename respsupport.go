@@ -25,6 +25,7 @@ type clientConnection struct {
 	authorized      bool
 	inMulti         bool
 	queue           datamodel.DataArray
+	writer          *bufio.Writer
 }
 
 func (cc *clientConnection) setCapacity(newCapacity int) {
@@ -48,27 +49,10 @@ func (cc *clientConnection) grow() {
 	cc.setCapacity(Cap + Delta)
 }
 
-func (cc *clientConnection) pushAnswer(answer datamodel.CustomDataType) {
-	if cc.answersSize == len(cc.answers) {
-		cc.grow()
-	}
-	cc.answers[cc.answersSize] = answer
-	cc.answersSize++
-}
-func (cc *clientConnection) popAnswers(writer *bufio.Writer) error {
-	for i := 0; i < cc.answersSize; i++ {
-		_, err := writer.Write(datamodel.ConvertToRASP(cc.answers[i]))
-		if err != nil {
-			return err
-		}
-		cc.answers[i] = nil
-	}
-	writer.Flush()
-	if cc.answersSize > 1024 {
-		cc.answers = make([]datamodel.CustomDataType, 100)
-	}
-	cc.answersSize = 0
-	return nil
+func (cc *clientConnection) pushAnswer(answer datamodel.CustomDataType) error {
+	_, err := cc.writer.Write(datamodel.ConvertToRASP(answer))
+	cc.writer.Flush()
+	return err
 }
 
 func (cc *clientConnection) processOneRESPCommandWithoutLock(command datamodel.DataArray) datamodel.CustomDataType {
@@ -179,68 +163,45 @@ func processRESPConnection(c net.Conn) {
 			buf := make([]byte, 4096)
 			n := runtime.Stack(buf, false)
 			buf = buf[0:n]
-			fmt.Printf("client run panic %s:%v\rLast command to server was:%s\r", buf, e, datamodel.DataObjectToString(request))
+			fmt.Printf("client run panic %s:%v\r\nLast command to server was:%s\r\n", buf, e, datamodel.DataObjectToString(request))
 		}
 		c.Close()
 		notifier.Done()
 	}()
-	fmt.Printf("New client connection detected. Remote address: %s\r", c.RemoteAddr().String())
+	fmt.Printf("New client connection detected. Remote address: %s\r\n", c.RemoteAddr().String())
 	notifier.Add(1)
 	reader := bufio.NewReader(c)
-	writer := bufio.NewWriter(c)
+
 	cc := &clientConnection{
 		answers:         make([]datamodel.CustomDataType, 100),
 		answersSize:     0,
 		currentDatabase: firstDatabase,
 		authorized:      !needAuth,
+		writer:          bufio.NewWriter(c),
 	}
 	go func() {
 		<-quit
 		c.SetReadDeadline(time.Now().Add(0))
 	}()
 	for {
-		/*		c.SetReadDeadline(time.Now().Add(time.Millisecond * 200))
-				ch, err := reader.ReadByte()
-				select {
-				case <-quit:
-					return
-				default:
-				}
-				if err != nil {
-					netErr, ok := err.(net.Error)
-					if ok && netErr.Timeout() && netErr.Temporary() {
-						if cc.answersSize != 0 {
-							if err := cc.popAnswers(writer); err != nil {
-								fmt.Printf("Client connection lost. Error:%s\r", err.Error())
-								return
-							}
-						}
-						continue
-					}
-				} else {
-					if ch == '\r' {
-						reader.ReadBytes(10)
-						continue
-					} else {
-						reader.UnreadByte()
-						c.SetReadDeadline(time.Now().Add(time.Second * 50))
-					}
-				}*/
 		request, err := datamodel.LoadRespFromIO(reader, true)
 		if err != nil {
 			parseError, ok := err.(datamodel.ParseError)
 			if !ok {
-				fmt.Printf("Client connection lost/ Error:%s\r", err.Error())
+				fmt.Printf("Client connection lost. Error:%s\r\n", err.Error())
 				return
 			}
 			answer := datamodel.CreateError(parseError.Error())
-			cc.pushAnswer(answer)
+			if cc.pushAnswer(answer) != nil {
+				return
+			}
+			continue
 		}
 		answer := cc.processOneRESPCommand(request)
-		cc.pushAnswer(answer)
-		cc.popAnswers(writer)
+		if cc.pushAnswer(answer) != nil {
+			return
+		}
 		if cc.needQuit {
-			cc.popAnswers(writer)
 			break
 		}
 	}
