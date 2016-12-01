@@ -828,12 +828,12 @@ var commands = []string{
 	`"OK"`,
 }
 
-var address = "127.0.0.1"
+var address = "188.226.131.142"
 
 func TestClient(t *testing.T) {
 	options := DefaultOptions
 	options.Address = address
-	options.Password = "test"
+	options.Password = "trytestmeagain"
 	options.Port = 18018
 	client, err := CreateClient(&options)
 	if err != nil {
@@ -872,7 +872,7 @@ func BenchmarkClient(b *testing.B) {
 	fmt.Println("Started with ", b.N)
 	options := DefaultOptions
 	options.Address = address
-	options.Password = "test"
+	options.Password = "trytestmeagain"
 	options.Port = 18018
 	t := time.Now()
 	client, err := CreateClient(&options)
@@ -905,7 +905,7 @@ func BenchmarkClient(b *testing.B) {
 func TestClient1000(b *testing.T) {
 	options := DefaultOptions
 	options.Address = address
-	options.Password = "test"
+	options.Password = "trytestmeagain"
 	options.Port = 18018
 	t := time.Now()
 	client, err := CreateClient(&options)
