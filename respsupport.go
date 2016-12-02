@@ -205,6 +205,7 @@ func processRESPConnection(c net.Conn) {
 			return
 		}
 		if cc.needQuit {
+			cc.writer.Flush()
 			break
 		}
 	}
